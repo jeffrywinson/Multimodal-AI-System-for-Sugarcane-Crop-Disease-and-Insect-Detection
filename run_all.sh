@@ -1,35 +1,41 @@
 #!/bin/bash
 
-echo "--- Starting Multimodal Analysis (Final Version) ---"
+# This script runs the final, integrated multimodal pipeline.
+# It requires two arguments: the path to the disease image and the path to the insect image.
 
-# 1. DEFINE INPUTS
-IMAGE_FILE="sugarcane_test_01.jpg"
+if [ "$#" -ne 2 ]; then
+    echo "Usage: ./run_all.sh <path_to_disease_image> <path_to_insect_image>"
+    exit 1
+fi
 
-# CORRECTED: Provide exactly 30 comma-separated answers for the disease questions
+DISEASE_IMAGE_PATH=$1
+INSECT_IMAGE_PATH=$2
+
+echo "--- Starting Final Multimodal Analysis ---"
+echo "Disease Image: $DISEASE_IMAGE_PATH"
+echo "Insect Image:  $INSECT_IMAGE_PATH"
+
+# --- Define Farmer's Text Inputs (30 answers each) ---
 DISEASE_SYMPTOMS="Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No"
-
-# CORRECTED: Provide exactly 30 comma-separated answers for the insect questions
 INSECT_SYMPTOMS="Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes"
 
-
-# 2. RUN MODELS AND CAPTURE OUTPUTS
+# --- Run All Four Models and Capture Outputs ---
 echo "Running models..."
 
-# Use the dummy scripts for now. Replace with real scripts later.
-YOLO_DISEASE_RESULT=$(python dummy_detect_disease.py --img "$IMAGE_FILE")
-YOLO_INSECT_RESULT=$(python dummy_detect_insect.py --img "$IMAGE_FILE")
-
-# Run your actual TabNet prediction scripts
+# Use the real prediction scripts
 # The python command needs the ./venv/Scripts/ prefix to work reliably in your setup
-TABNET_DISEASE_RESULT=$(./venv/Scripts/python predict_disease_tabnet.py --answers "$DISEASE_SYMPTOMS")
-TABNET_INSECT_RESULT=$(./venv/Scripts/python predict_insect_tabnet.py --answers "$INSECT_SYMPTOMS")
+YOLO_DISEASE_RESULT=$(./venv/Scripts/python detect_disease.py --image "$DISEASE_IMAGE_PATH")
+YOLO_INSECT_RESULT=$(./venv/Scripts/python detect_insect.py --image "$INSECT_IMAGE_PATH")
 
+# Point to the TabNet scripts inside the new 'tabnet' folder
+TABNET_DISEASE_RESULT=$(./venv/Scripts/python tabnet/predict_disease_tabnet.py --answers "$DISEASE_SYMPTOMS")
+TABNET_INSECT_RESULT=$(./venv/Scripts/python tabnet/predict_insect_tabnet.py --answers "$INSECT_SYMPTOMS")
 
-# 3. RUN THE FUSION SCRIPT
+# --- Run the Fusion Script ---
 echo "--- Final Fused Output ---"
-# The python command needs the ./venv/Scripts/ prefix here as well
+# The fusion script is in the main directory
 ./venv/Scripts/python fusion.py \
-    --image_name "$IMAGE_FILE" \
+    --image_name "Combined Analysis" \
     --yolo_disease "$YOLO_DISEASE_RESULT" \
     --tabnet_disease "$TABNET_DISEASE_RESULT" \
     --yolo_insect "$YOLO_INSECT_RESULT" \
