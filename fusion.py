@@ -1,4 +1,4 @@
-# fusion.py (Final Version with Summary)
+# fusion.py (Final Robust Version)
 import argparse
 import json
 
@@ -10,9 +10,10 @@ def fuse_predictions(image_name, yolo_disease, tabnet_disease, yolo_insect, tabn
     }
 
     # --- Fuse Disease Predictions ---
-    # The logic here is slightly adjusted to make the final diagnosis simpler for parsing.
-    is_yolo_disease_present = yolo_disease == 'Present'
-    is_tabnet_disease_present = tabnet_disease == 'Present'
+    # CORRECTED LOGIC: Check if "Present" is IN the output string,
+    # which ignores any extra text from the library's first run.
+    is_yolo_disease_present = "Present" in yolo_disease
+    is_tabnet_disease_present = "Present" in tabnet_disease
 
     if is_yolo_disease_present and is_tabnet_disease_present:
         disease_diagnosis = "Confirmed: Disease Present (High Confidence)"
@@ -24,14 +25,15 @@ def fuse_predictions(image_name, yolo_disease, tabnet_disease, yolo_insect, tabn
         disease_diagnosis = "No Disease Detected"
         
     final_output["disease_analysis"] = {
-        "image_detection": yolo_disease,
+        "image_detection": yolo_disease.strip(), # Use .strip() to clean up whitespace
         "symptom_prediction": tabnet_disease,
         "final_diagnosis": disease_diagnosis
     }
 
     # --- Fuse Insect Predictions ---
-    is_yolo_insect_present = yolo_insect == 'Present'
-    is_tabnet_insect_present = tabnet_insect == 'Present'
+    # Apply the same robust logic here for consistency
+    is_yolo_insect_present = "Present" in yolo_insect
+    is_tabnet_insect_present = "Present" in tabnet_insect
 
     if is_yolo_insect_present and is_tabnet_insect_present:
         insect_diagnosis = "Confirmed: Insect Present (High Confidence)"
@@ -43,17 +45,15 @@ def fuse_predictions(image_name, yolo_disease, tabnet_disease, yolo_insect, tabn
         insect_diagnosis = "No Insect Detected"
 
     final_output["insect_analysis"] = {
-        "image_detection": yolo_insect,
+        "image_detection": yolo_insect.strip(), # Use .strip() to clean up whitespace
         "symptom_prediction": tabnet_insect,
         "final_diagnosis": insect_diagnosis
     }
 
-    # --- Print the Detailed JSON Output (as before) ---
+    # --- Print the Detailed JSON Output ---
     print(json.dumps(final_output, indent=4))
 
-
-    # --- NEW: Print the Final Simplified Summary ---
-    # This section parses the final diagnosis strings we just created.
+    # --- Print the Final Simplified Summary ---
     print("\n-------------------------------------")
     print("Final Output:")
 

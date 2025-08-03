@@ -1,5 +1,4 @@
 # requirements.txt
-python3
 # Core library for YOLOv8 and YOLOv8-seg models
 ultralytics
 
