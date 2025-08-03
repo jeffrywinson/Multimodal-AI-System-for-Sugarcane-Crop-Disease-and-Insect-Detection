@@ -8,7 +8,7 @@ def predict(answers_list):
     encoded_answers = [1 if ans.strip().lower() == 'yes' else 0 for ans in answers_list]
 
     clf = TabNetClassifier()
-    clf.load_model('./tabnet_disease_model.zip')
+    clf.load_model('./tabnet/tabnet_disease_model.zip')
 
     prediction = clf.predict(np.array([encoded_answers]))
 

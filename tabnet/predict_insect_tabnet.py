@@ -8,7 +8,7 @@ def predict(answers_list):
     encoded_answers = [1 if ans.strip().lower() == 'yes' else 0 for ans in answers_list]
 
     clf = TabNetClassifier()
-    clf.load_model('./tabnet_insect_model.zip') # The only change is this line
+    clf.load_model('./tabnet/tabnet_insect_model.zip') # The only change is this line
 
     prediction = clf.predict(np.array([encoded_answers]))
 
