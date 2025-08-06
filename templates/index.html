@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agri-AI Diagnostics</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f8f4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .header { background-color: #2c6b2f; color: white; padding: 2rem; text-align: center; border-bottom: 5px solid #235425; }
+        .header h1 { font-weight: bold; }
+        .container { max-width: 800px; margin-top: 2rem; }
+        .card { box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 0.75rem; border: none; }
+        .card-title { color: #2c6b2f; font-weight: 600; }
+        .spinner-border { display: none; }
+        #symptom-card, #results-card { display: none; }
+        .question-section { margin-bottom: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; }
+        .question-section:first-child { border-top: none; padding-top: 0; }
+        .btn-primary { background-color: #2c6b2f; border-color: #2c6b2f; }
+        .btn-primary:hover { background-color: #235425; border-color: #235425; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🌾 Agri-AI Diagnostics</h1>
+        <p class="lead">Upload a crop image for instant analysis.</p>
+    </div>
+
+    <div class="container">
+        <div class="card mb-4" id="upload-card">
+            <div class="card-body p-4">
+                <h5 class="card-title">Step 1: Upload Crop Image</h5>
+                <form id="upload-form">
+                    <div class="mb-3">
+                        <input class="form-control" type="file" id="image-input" accept="image/*" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Analyze Image</button>
+                </form>
+                 <div class="d-flex justify-content-center mt-3">
+                    <div class="spinner-border text-success" role="status" id="spinner">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4" id="symptom-card">
+            <div class="card-body p-4">
+                <h5 class="card-title">Step 2: Answer a Few Questions</h5>
+                <p class="text-muted small">Please provide additional information about the crop's condition.</p>
+                <form id="symptom-form"></form>
+                <button id="submit-symptoms" class="btn btn-success w-100 mt-3">Get Final Diagnosis</button>
+            </div>
+        </div>
+        
+        <div class="card" id="results-card">
+            <div class="card-header fw-bold bg-light">Final Analysis</div>
+            <div class="card-body p-4" id="results-content">
+                </div>
+        </div>
+    </div>
+
+<script>
+    // Get references to all the HTML elements
+    const uploadForm = document.getElementById('upload-form');
+    const imageInput = document.getElementById('image-input');
+    const spinner = document.getElementById('spinner');
+    
+    const uploadCard = document.getElementById('upload-card');
+    const symptomCard = document.getElementById('symptom-card');
+    const symptomForm = document.getElementById('symptom-form');
+    const submitSymptomsBtn = document.getElementById('submit-symptoms');
+
+    const resultsCard = document.getElementById('results-card');
+    const resultsContent = document.getElementById('results-content');
+    
+    let analysisData = {};
+
+    // --- Step 1: Handle Image Upload (No changes here) ---
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!imageInput.files || imageInput.files.length === 0) {
+            alert("Please select an image file first.");
+            return;
+        }
+        spinner.style.display = 'block';
+        const formData = new FormData();
+        formData.append('file', imageInput.files[0]);
+        try {
+            const response = await fetch('/analyze', { method: 'POST', body: formData });
+            if (response.ok) {
+                analysisData = await response.json();
+                uploadCard.style.display = 'none';
+                displayQuestions(analysisData);
+                symptomCard.style.display = 'block';
+            } else {
+                alert('Error analyzing image. Please check the server.');
+            }
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            alert('Could not connect to the server. Is the Python app running?');
+        } finally {
+            spinner.style.display = 'none';
+        }
+    });
+
+    // --- Step 2: Handle Symptom Submission (CORRECTED LOGIC) ---
+    submitSymptomsBtn.addEventListener('click', async () => {
+        const form = new FormData(symptomForm);
+        const answersWithPrefix = Object.fromEntries(form.entries());
+        
+        // **NEW**: Create a new answers object and remove the prefixes
+        const finalAnswers = {};
+        for (const key in answersWithPrefix) {
+            const originalKey = key.replace('disease_', '').replace('insect_', '');
+            finalAnswers[originalKey] = answersWithPrefix[key];
+        }
+
+        const payload = {
+            image_name: analysisData.image_name,
+            yolo_disease: analysisData.yolo_disease,
+            yolo_insect: analysisData.yolo_insect,
+            answers: finalAnswers // Use the corrected answers object
+        };
+
+        try {
+            const response = await fetch('/fuse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                const finalResults = await response.json();
+                symptomCard.style.display = 'none';
+                displayResults(finalResults);
+                resultsCard.style.display = 'block';
+            } else {
+                alert('Error generating final diagnosis.');
+            }
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            alert('Could not connect to the server for fusion.');
+        }
+    });
+    
+    // --- Helper function to build the question form (CORRECTED) ---
+    function displayQuestions(data) {
+        symptomForm.innerHTML = ''; 
+
+        // Add disease questions with a "disease_" prefix
+        if (data.questions && data.questions.disease_questions) {
+            const diseaseSection = createSection('Disease Symptoms');
+            data.questions.disease_questions.forEach(q => {
+                diseaseSection.appendChild(createQuestionElement(q, 'disease_'));
+            });
+            symptomForm.appendChild(diseaseSection);
+        }
+
+        // Add insect questions with an "insect_" prefix
+        if (data.questions && data.questions.insect_questions) {
+            const insectSection = createSection('Insect Symptoms');
+            data.questions.insect_questions.forEach(q => {
+                insectSection.appendChild(createQuestionElement(q, 'insect_'));
+            });
+            symptomForm.appendChild(insectSection);
+        }
+    }
+
+    function createSection(title) {
+        const section = document.createElement('div');
+        section.className = 'question-section';
+        section.innerHTML = `<h6>${title}</h6>`;
+        return section;
+    }
+
+    // This function now accepts a prefix to make the names unique
+    function createQuestionElement(q, prefix) {
+        const uniqueId = prefix + q.id;
+        const formGroup = document.createElement('div');
+        formGroup.className = 'mb-3';
+        formGroup.innerHTML = `
+            <label class="form-label small">${q.text}</label>
+            <div>
+                <input type="radio" class="btn-check" name="${uniqueId}" id="${uniqueId}-yes" value="yes" autocomplete="off" required>
+                <label class="btn btn-outline-success btn-sm" for="${uniqueId}-yes">Yes</label>
+
+                <input type="radio" class="btn-check" name="${uniqueId}" id="${uniqueId}-no" value="no" autocomplete="off" checked>
+                <label class="btn btn-outline-danger btn-sm" for="${uniqueId}-no">No</label>
+            </div>
+        `;
+        return formGroup;
+    }
+    
+    // --- Helper function to display final diagnosis (No changes here) ---
+    function displayResults(results) {
+        const disease = results.disease_analysis;
+        const insect = results.insect_analysis;
+        const getConfidenceClass = (diagnosis) => {
+            if (diagnosis.startsWith("Confirmed")) return "text-danger";
+            if (diagnosis.startsWith("Possible")) return "text-warning";
+            return "text-success";
+        };
+        resultsContent.innerHTML = `
+            <div class="mb-3">
+                <h6>Disease Analysis</h6>
+                <p class="mb-1"><strong>Final Diagnosis:</strong> <span class="fw-bold ${getConfidenceClass(disease.final_diagnosis)}">${disease.final_diagnosis}</span></p>
+                <ul class="list-unstyled small text-muted">
+                    <li>Visual Detection (Image): ${disease.image_detection}</li>
+                    <li>Symptom Analysis (Answers): ${disease.symptom_prediction}</li>
+                </ul>
+            </div>
+            <hr>
+            <div>
+                <h6>Insect Analysis</h6>
+                <p class="mb-1"><strong>Final Diagnosis:</strong> <span class="fw-bold ${getConfidenceClass(insect.final_diagnosis)}">${insect.final_diagnosis}</span></p>
+                <ul class="list-unstyled small text-muted">
+                    <li>Visual Detection (Image): ${insect.image_detection}</li>
+                    <li>Symptom Analysis (Answers): ${insect.symptom_prediction}</li>
+                </ul>
+            </div>
+        `;
+    }
+</script>
+
+</body>
+</html>
