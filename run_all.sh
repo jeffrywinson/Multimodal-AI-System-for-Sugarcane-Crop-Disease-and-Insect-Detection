@@ -19,10 +19,9 @@ INSECT_IMAGE_PATH=$2
 
 
 # --- 1. Universal Environment Detection ---
-# This block makes the script work everywhere.
 echo "--- Detecting Python Environment ---"
 if [ -d "venv" ]; then
-    # A local venv folder exists. Check for Windows vs Linux/macOS path.
+    # A local venv folder exists.
     if [ -f "venv/Scripts/python" ]; then
         PYTHON_EXEC="./venv/Scripts/python" # Windows venv
         echo "Local Windows virtual environment detected."
@@ -32,7 +31,6 @@ if [ -d "venv" ]; then
     fi
 else
     # No venv folder found. Assume a Colab-like environment.
-    # Use the globally available python3 command.
     PYTHON_EXEC="python3"
     echo "No local venv detected. Using global 'python3' (for Colab or similar environments)."
 fi
@@ -41,7 +39,6 @@ fi
 # --- 2. Automatic Dependency Installation ---
 echo ""
 echo "--- Checking and Installing Dependencies from requirements.txt ---"
-# The script now uses the universal $PYTHON_EXEC variable
 $PYTHON_EXEC -m pip install -q -r requirements.txt
 echo "--- Dependencies are up to date. ---"
 
@@ -58,7 +55,6 @@ INSECT_SYMPTOMS="Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes
 
 # --- Run All Four Models and Capture Outputs ---
 echo "Running models..."
-# All python calls now use the cross-platform $PYTHON_EXEC variable
 YOLO_DISEASE_RESULT=$($PYTHON_EXEC detect_disease.py --image "$DISEASE_IMAGE_PATH")
 YOLO_INSECT_RESULT=$($PYTHON_EXEC detect_insect.py --image "$INSECT_IMAGE_PATH")
 TABNET_DISEASE_RESULT=$($PYTHON_EXEC tabnet/predict_disease_tabnet.py --answers "$DISEASE_SYMPTOMS")
@@ -66,8 +62,8 @@ TABNET_INSECT_RESULT=$($PYTHON_EXEC tabnet/predict_insect_tabnet.py --answers "$
 
 # --- Run the Fusion Script ---
 echo "--- Final Fused Output ---"
+# CORRECTED: The --image_name argument has been removed from this call
 $PYTHON_EXEC fusion.py \
-    --image_name "Combined Analysis" \
     --yolo_disease "$YOLO_DISEASE_RESULT" \
     --tabnet_disease "$TABNET_DISEASE_RESULT" \
     --yolo_insect "$YOLO_INSECT_RESULT" \

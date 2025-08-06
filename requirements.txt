@@ -1,15 +1,13 @@
-# requirements.txt
-# Core library for YOLOv8 and YOLOv8-seg models
+# requirements.txt (Complete for Round 2)
+
+# For YOLO and YOLO-seg models
 ultralytics
 
-# Core library for TabNet model
+# For TabNet models
 pytorch-tabnet
 
-# General data handling and machine learning utilities
-pandas
-scikit-learn
-
-# PyTorch is a dependency for both ultralytics and pytorch-tabnet
-# Listing it ensures a specific version can be set if needed, but it's often installed automatically.
+# For the Fusion Neural Network and general data handling
 torch
 torchvision
+pandas
+scikit-learn

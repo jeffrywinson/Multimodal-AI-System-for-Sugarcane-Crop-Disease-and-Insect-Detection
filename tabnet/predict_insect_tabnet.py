@@ -10,11 +10,11 @@ def predict(answers_list):
     clf = TabNetClassifier()
     clf.load_model('./tabnet/tabnet_insect_model.zip') # The only change is this line
 
-    prediction = clf.predict(np.array([encoded_answers]))
-
-    # This encoding must match the training script: 'Not Present' -> 0, 'Present' -> 1
-    result = 'Present' if prediction[0] == 1 else 'Not Present'
-    print(result)
+    # Predict probabilities. It returns a value for "Not Present" and "Present". We want the second one.
+    # The output will be a number like 0.842
+    prediction_proba = clf.predict_proba(np.array([encoded_answers]))
+    probability_present = prediction_proba[0][1]
+    print(probability_present)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Predict insect presence from answers.")
