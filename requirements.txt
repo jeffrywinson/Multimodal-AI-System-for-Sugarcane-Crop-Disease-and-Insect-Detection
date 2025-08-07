@@ -6,3 +6,4 @@ pytorch-tabnet
 scikit-learn
 gunicorn
 torchvision
+flask_cors
