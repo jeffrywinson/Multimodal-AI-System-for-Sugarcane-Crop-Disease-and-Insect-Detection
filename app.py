@@ -29,45 +29,51 @@ def home():
     return render_template('index.html')
 
 
+# In your app.py file
+
 @app.route('/analyze', methods=['POST'])
 def analyze_image():
     """
-    Endpoint for Step 1: Upload image, run YOLO models, return initial results and questions.
+    Endpoint for Step 1: Receives a crop image and an insect image,
+    runs the correct YOLO model on each, and returns initial results plus questions.
     """
-    # --- Start of Debugging Code ---
-    print("\n--- /analyze endpoint was hit ---") # Checkpoint 1: Confirms the function is being called.
-    
-    # This print statement is the most important one. Let's see what's inside request.files.
-    print(f"Contents of request.files: {request.files}") # Checkpoint 2: Shows what files the server received.
-    # --- End of Debugging Code ---
+    print("\n--- /analyze endpoint was hit ---")
 
-    if 'file' not in request.files:
-        print("DEBUG: 'file' key was NOT found in request.files.") # Checkpoint 3
-        return jsonify({"error": "No file part"}), 400
-    
-    file = request.files['file']
-    
-    if file.filename == '':
-        print("DEBUG: File was found, but its filename is empty.") # Checkpoint 4
-        return jsonify({"error": "No selected file"}), 400
+    # --- UPDATED LOGIC TO HANDLE TWO FILES ---
+    if 'crop_image' not in request.files or 'insect_image' not in request.files:
+        return jsonify({"error": "Both crop and insect images are required."}), 400
 
-    if file:
-        print(f"DEBUG: File '{file.filename}' received. Proceeding with analysis.") # Checkpoint 5
-        filename = secure_filename(file.filename)
-        image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(image_path)
+    crop_file = request.files['crop_image']
+    insect_file = request.files['insect_image']
 
-        # Run initial image analysis with YOLO
-        print("DEBUG: Starting YOLO predictions...")
-        yolo_disease_result = predict_disease_yolo(image_path)
-        yolo_insect_result = predict_insect_yolo(image_path)
-        print("DEBUG: YOLO predictions finished.")
+    if crop_file.filename == '' or insect_file.filename == '':
+        return jsonify({"error": "Please select both files."}), 400
+
+    # --- Process each file with its specific model ---
+    if crop_file and insect_file:
+        crop_filename = secure_filename(crop_file.filename)
+        insect_filename = secure_filename(insect_file.filename)
+
+        crop_image_path = os.path.join(app.config['UPLOAD_FOLDER'], crop_filename)
+        insect_image_path = os.path.join(app.config['UPLOAD_FOLDER'], insect_filename)
+
+        crop_file.save(crop_image_path)
+        insect_file.save(insect_image_path)
+        print(f"DEBUG: Saved crop image to {crop_image_path}")
+        print(f"DEBUG: Saved insect image to {insect_image_path}")
+
+        # Run each model on its corresponding image
+        print("DEBUG: Starting model predictions...")
+        yolo_disease_result = predict_disease_yolo(crop_image_path)
+        yolo_insect_result = predict_insect_yolo(insect_image_path)
+        print("DEBUG: Model predictions finished.")
         
-        # Get questions for the next step
+        # Get questions for the next step (this part doesn't change)
         questions = get_symptom_questions()
 
         response_data = {
-            "image_name": filename,
+            # We'll use the crop image name for reference in the next step
+            "image_name": crop_filename, 
             "yolo_disease": yolo_disease_result,
             "yolo_insect": yolo_insect_result,
             "questions": questions
@@ -75,8 +81,7 @@ def analyze_image():
         print("DEBUG: Successfully prepared response data. Sending to browser.")
         return jsonify(response_data)
 
-    # This part should ideally not be reached, but is here for completeness.
-    return jsonify({"error": "An unknown error occurred"}), 500
+    return jsonify({"error": "An unknown error occurred with file processing."}), 500
 
 
 @app.route('/fuse', methods=['POST'])
