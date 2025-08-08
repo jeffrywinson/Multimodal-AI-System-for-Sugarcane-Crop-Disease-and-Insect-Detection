@@ -1,8 +1,18 @@
+# requirements.txt (Complete for Round 2)
+
+# For YOLO and YOLO-seg models
 flask
 torch
 ultralytics
+
+# For TabNet models
 pandas
 pytorch-tabnet
+
+# For the Fusion Neural Network and general data handling
+torch
+torchvision
+pandas
 scikit-learn
 gunicorn
 torchvision

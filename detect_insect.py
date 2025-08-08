@@ -12,10 +12,11 @@ def predict_insect(image_path):
     results = model.predict(image_path, verbose=False)
 
     # Check if any bounding boxes (insects) were detected
-    if len(results[0].boxes) > 0:
-        print("Present")
+    # Output the number of detected instances
+    if results[0].boxes is not None:
+        print(len(results[0].boxes))
     else:
-        print("Not Present")
+        print(0)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Detect insects in an image.")
