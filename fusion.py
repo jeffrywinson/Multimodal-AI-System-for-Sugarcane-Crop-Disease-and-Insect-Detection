@@ -1,27 +1,43 @@
-# fusion.py (Neural Network Version)
+# fusion.py (Definitive Version - Matches Final Training Script)
 import torch
 import torch.nn as nn
 import argparse
 import json
 
-# Define the exact same neural network architecture as in the training script
+# --- DEFINE THE WINNING ARCHITECTURE FOUND BY OPTUNA ---
+# This dictionary MUST match the one in your final training script.
+BEST_PARAMS = {
+    'n_layers': 3,
+    'n_units_l0': 45,
+    'n_units_l1': 60,
+    'n_units_l2': 55,
+    'optimizer': 'Adam',
+    'lr': 0.00626330958689155
+}
+# ---------------------------------------------------------------
+
 class FusionNet(nn.Module):
     def __init__(self):
         super(FusionNet, self).__init__()
-        self.layer_1 = nn.Linear(4, 16)
-        self.layer_2 = nn.Linear(16, 8)
-        self.output_layer = nn.Linear(8, 2)
-        self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
+        layers = []
+        in_features = 4
+        # Dynamically build the network exactly as it was during training
+        for i in range(BEST_PARAMS['n_layers']):
+            out_features = BEST_PARAMS[f'n_units_l{i}']
+            layers.append(nn.Linear(in_features, out_features))
+            layers.append(nn.ReLU())
+            in_features = out_features
+        layers.append(nn.Linear(in_features, 2))
+        layers.append(nn.Sigmoid())
+        
+        # This self.network wrapper is the key to matching the saved file
+        self.network = nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.relu(self.layer_1(x))
-        x = self.relu(self.layer_2(x))
-        x = self.sigmoid(self.output_layer(x))
-        return x
+        return self.network(x)
 
 def run_fusion(inputs):
-    # 1. Load the trained model
+    # 1. Load the trained model into the correctly defined architecture
     model = FusionNet()
     model.load_state_dict(torch.load('fusion_model.pth'))
     model.eval()
@@ -43,7 +59,7 @@ def run_fusion(inputs):
     # 5. Create final JSON output
     final_output = {
         "disease_analysis": {
-            "yolo_output": f"{inputs[0]} detections",
+            "yolo_output": f"{inputs[0]} detections/area",
             "tabnet_probability": f"{inputs[2]:.4f}",
             "fused_probability": f"{disease_prob:.4f}",
             "final_diagnosis": disease_present
@@ -67,13 +83,11 @@ def run_fusion(inputs):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fuse model outputs with a neural network.")
-    # We now expect 4 numerical inputs
     parser.add_argument("--yolo_disease", type=float, required=True)
     parser.add_argument("--yolo_insect", type=float, required=True)
     parser.add_argument("--tabnet_disease", type=float, required=True)
     parser.add_argument("--tabnet_insect", type=float, required=True)
     
     args = parser.parse_args()
-    # Create a list of the inputs
     model_inputs = [args.yolo_disease, args.yolo_insect, args.tabnet_disease, args.tabnet_insect]
     run_fusion(model_inputs)

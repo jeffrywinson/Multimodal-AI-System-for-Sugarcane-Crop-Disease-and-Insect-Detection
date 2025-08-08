@@ -50,8 +50,10 @@ echo "Disease Image: $DISEASE_IMAGE_PATH"
 echo "Insect Image:  $INSECT_IMAGE_PATH"
 
 # --- Define Farmer's Text Inputs (30 answers each) ---
-DISEASE_SYMPTOMS="Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No,Yes,No"
-INSECT_SYMPTOMS="Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes,No,No,Yes,Yes"
+# DISEASE_SYMPTOMS="No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No"
+# INSECT_SYMPTOMS="No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No"
+DISEASE_SYMPTOMS="No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,No,Yes,Yes,No,No,Yes,No"
+INSECT_SYMPTOMS="No,No,No,No,No,No,No,No,No,No,No,No,No,Yes,No,No,No,No,No,Yes,No,No,No,No,No,No,No,Yes,No,No"
 
 # --- Run All Four Models and Capture Outputs ---
 echo "Running models..."
