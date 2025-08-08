@@ -84,11 +84,14 @@ def analyze_image():
     return jsonify({"error": "An unknown error occurred with file processing."}), 500
 
 
+# app.py
+
 @app.route('/fuse', methods=['POST'])
 def fuse_all_predictions():
     """
     Endpoint for Step 2: Receive symptom answers, run TabNet & Fusion, return final diagnosis.
     """
+    print("\n--- /fuse endpoint was hit ---")
     data = request.json
     
     # Get all necessary data from the frontend
@@ -98,17 +101,32 @@ def fuse_all_predictions():
     answers = data.get('answers')
 
     # Run symptom analysis with TabNet
-    tabnet_disease, tabnet_insect = analyze_symptoms_tabnet(answers)
+    print("DEBUG: Analyzing symptoms with TabNet...")
+    tabnet_disease_str, tabnet_insect_str = analyze_symptoms_tabnet(answers)
+    print(f"DEBUG: Received from TabNet -> Disease: '{tabnet_disease_str}', Insect: '{tabnet_insect_str}'")
 
-    # Run the final fusion logic
+    try:
+        # --- KEY FIX IS HERE ---
+        # Convert the string outputs from TabNet into floats.
+        tabnet_disease_prob = float(tabnet_disease_str)
+        tabnet_insect_prob = float(tabnet_insect_str)
+        print(f"DEBUG: Converted to float -> Disease: {tabnet_disease_prob}, Insect: {tabnet_insect_prob}")
+
+    except (ValueError, TypeError) as e:
+        print(f"ERROR: Could not convert TabNet results to float. Error: {e}")
+        return jsonify({"error": "Invalid data format received from symptom analysis."}), 500
+
+    # Run the final fusion logic with the correctly typed data
+    print("DEBUG: Running final fusion logic...")
     final_output = fuse_predictions(
         image_name,
         yolo_disease,
-        tabnet_disease,
+        tabnet_disease_prob, # <-- Passing the float
         yolo_insect,
-        tabnet_insect
+        tabnet_insect_prob   # <-- Passing the float
     )
     
+    print("DEBUG: Fusion complete. Sending final diagnosis to browser.")
     return jsonify(final_output)
 
 
