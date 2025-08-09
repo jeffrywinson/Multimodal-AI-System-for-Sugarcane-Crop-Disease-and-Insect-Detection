@@ -1,13 +1,17 @@
-# model_handler.py (Definitive Final Version for Round 2)
+# prepare_round2_tabnet.py
 
 import pandas as pd
-import numpy as np
+import torch
 from pytorch_tabnet.tab_model import TabNetClassifier
-from ultralytics import YOLO
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+import random
 
 # ==============================================================================
-# 1. FINAL, CORRECT QUESTIONS FOR ROUND 2
+# 1. DEFINE NEW DOMAIN-SPECIFIC RULES FOR ROUND 2
 # ==============================================================================
+
+# For Insect Detection (Early Shoot Borer / Internode Borer / No Insect)
 insect_rules = [
     ("Is the crop ≤ 120 days old (i.e., within first 4 months)?", "ESB_positive"),
     ("Did the damage start after 4 months from planting?", "INB_positive"),
@@ -40,6 +44,8 @@ insect_rules = [
     ("Was trash mulching done early in the crop stage?", "ESB_management_positive"),
     ("Was earthing-up done to cover the lower stalk area?", "ESB_management_positive")
 ]
+
+# For Dead Heart Detection
 dead_heart_rules = [
     ("Have you seen the central growing point of the stalk damaged or dead?", "dead_heart_confirmation_positive"),
     ("Is the dead central shoot straw-coloured?", "dead_heart_confirmation_positive"),
@@ -74,77 +80,146 @@ dead_heart_rules = [
 ]
 
 
-# --- MODEL LOADING (Done once when the app starts) ---
-print("--- Loading all models into memory... ---")
-TABNET_DISEASE_MODEL = TabNetClassifier()
-TABNET_DISEASE_MODEL.load_model('./tabnet/tabnet_disease_model.zip')
+# ==============================================================================
+# 2. ADVANCED DATA GENERATION SCRIPT
+# ==============================================================================
 
-TABNET_INSECT_MODEL = TabNetClassifier()
-TABNET_INSECT_MODEL.load_model('./tabnet/tabnet_insect_model.zip')
+def generate_multi_class_insect_data(filename, rules, num_rows=20000):
+    """Generates multi-class data for insect detection."""
+    print(f"Generating multi-class synthetic data for {filename}...")
+    questions = [rule[0] for rule in rules]
+    score_types = [rule[1] for rule in rules]
+    column_headers = [f'q_{i+1}' for i in range(len(questions))]
+    
+    data = []
+    for _ in range(num_rows):
+        answers = [random.choice(['Yes', 'No']) for _ in questions]
+        esb_score = 0
+        inb_score = 0
+        
+        for i, answer in enumerate(answers):
+            if answer == 'No': continue
+            
+            rule_type = score_types[i]
+            if rule_type == "ESB_positive": esb_score += 2
+            elif rule_type == "INB_positive": inb_score += 2
+            elif rule_type == "general_borer_positive":
+                esb_score += 1
+                inb_score += 1
+            elif rule_type == "ESB_management_positive": esb_score -= 3
 
-YOLO_DISEASE_MODEL = YOLO("./YOLOv8s-seg/best.pt")
-YOLO_INSECT_MODEL = YOLO("./YOLOv8s/yolov8s_insect_detection_best.pt")
-print("--- All models loaded successfully. ---")
+        # Determine final class
+        if esb_score > 5 and esb_score > inb_score: final_class = "Early Shoot Borer"
+        elif inb_score > 5 and inb_score > esb_score: final_class = "Internode Borer"
+        else: final_class = "No Insect"
+        
+        row = answers + [final_class]
+        data.append(row)
+        
+    df = pd.DataFrame(data, columns=column_headers + ['Presence'])
+    df.to_csv(filename, index=False)
+    print(f"Successfully created {filename}.")
+
+def generate_binary_dead_heart_data(filename, rules, num_rows=20000):
+    """Generates binary data for dead heart detection."""
+    print(f"Generating binary synthetic data for {filename}...")
+    questions = [rule[0] for rule in rules]
+    score_types = [rule[1] for rule in rules]
+    column_headers = [f'q_{i+1}' for i in range(len(questions))]
+    
+    data = []
+    for _ in range(num_rows):
+        answers = [random.choice(['Yes', 'No']) for _ in questions]
+        score = 0
+        for i, answer in enumerate(answers):
+            if answer == 'No': continue
+            
+            rule_type = score_types[i]
+            if "confirmation_positive" in rule_type: score += 3
+            elif "cause_positive" in rule_type: score += 1
+            elif "negative" in rule_type: score -= 2
+
+        final_class = "Present" if score > 6 else "Not Present"
+        
+        row = answers + [final_class]
+        data.append(row)
+        
+    df = pd.DataFrame(data, columns=column_headers + ['Presence'])
+    df.to_csv(filename, index=False)
+    print(f"Successfully created {filename}.")
 
 
 # ==============================================================================
-# 2. DEFINE THE PREDICTION FUNCTIONS
+# 3. TABNET TRAINING SCRIPT
 # ==============================================================================
 
-def get_symptom_questions():
-    """
-    Returns a structured dictionary of question objects for the frontend.
-    THIS IS THE CORRECTED FUNCTION.
-    """
-    # Instead of a list of strings, create a list of objects.
-    disease_question_list = [{"text": rule[0]} for rule in dead_heart_rules]
-    insect_question_list = [{"text": rule[0]} for rule in insect_rules]
+def train_tabnet_model(csv_path, model_name):
+    """Loads data, trains a TabNet model, and saves it."""
+    print(f"\n--- Starting training for {model_name} ---")
     
-    return {
-        "disease_questions": disease_question_list,
-        "insect_questions": insect_question_list
-    }
-
-def predict_disease_yolo(image_path):
-    """Runs the YOLO segmentation model and returns the disease area percentage."""
-    results = YOLO_DISEASE_MODEL.predict(image_path, verbose=False)
-    if results[0].masks is not None and len(results[0].masks) > 0:
-        h, w = results[0].orig_shape
-        image_area = h * w
-        total_disease_area = sum(mask.data.sum() for mask in results[0].masks)
-        return (total_disease_area / image_area).item()
-    return 0.0
-
-def predict_insect_yolo(image_path):
-    """Runs the YOLO detection model and returns the number of insects found."""
-    results = YOLO_INSECT_MODEL.predict(image_path, verbose=False)
-    return float(len(results[0].boxes))
-
-def analyze_symptoms_tabnet(disease_answers, insect_answers):
-    """
-    Takes two lists of answers and returns the TabNet model predictions.
-    This now correctly handles the inputs.
-    """
-    # --- Process Disease/Dead Heart Answers ---
-    # Add a check for None to prevent the 'iterable' crash
-    if disease_answers is None: disease_answers = []
-    # Ensure the input array has the correct shape (1, 30) even if empty
-    disease_input_array = np.array([[1 if ans and ans.lower() == 'yes' else 0 for ans in disease_answers]]).reshape(1, -1)
-    if disease_input_array.shape[1] == 0: # Handle case of empty list
-        disease_input_array = np.zeros((1, 30))
-        
-    disease_probs = TABNET_DISEASE_MODEL.predict_proba(disease_input_array)
-    tabnet_disease_prob = disease_probs[0][1]
-
-    # --- Process Insect Answers ---
-    if insect_answers is None: insect_answers = []
-    insect_input_array = np.array([[1 if ans and ans.lower() == 'yes' else 0 for ans in insect_answers]]).reshape(1, -1)
-    if insect_input_array.shape[1] == 0:
-        insect_input_array = np.zeros((1, 30))
-        
-    prediction_index = TABNET_INSECT_MODEL.predict(insect_input_array)[0]
+    df = pd.read_csv(csv_path)
+    target = 'Presence'
     
-    class_mapping = {0: "Early Shoot Borer", 1: "Internode Borer", 2: "No Insect"}
-    tabnet_insect_class = class_mapping.get(prediction_index, "No Insect")
+    X = df.drop(columns=[target])
+    y = df[target]
 
-    return tabnet_disease_prob, tabnet_insect_class
+    # Preprocessing
+    categorical_features = list(X.columns)
+    le_y = LabelEncoder()
+    y_encoded = le_y.fit_transform(y)
+    
+    for col in categorical_features:
+        le_x = LabelEncoder()
+        X[col] = le_x.fit_transform(X[col])
+
+    X_train, X_val, y_train, y_val = train_test_split(X.values, y_encoded, test_size=0.2, random_state=42)
+
+    # Use best parameters from Optuna/previous runs
+    clf = TabNetClassifier(
+        n_d=32, n_a=32,
+        n_steps=5,
+        gamma=1.5,
+        lambda_sparse=0.0001,
+        mask_type='sparsemax',
+        optimizer_fn=torch.optim.Adam,
+        optimizer_params=dict(lr=2e-2, weight_decay=1e-5),
+        seed=42,
+        verbose=1
+    )
+
+    clf.fit(
+        X_train=X_train, y_train=y_train,
+        eval_set=[(X_val, y_val)],
+        eval_name=['validation'],
+        patience=20,
+        max_epochs=150,
+        batch_size=2048
+    )
+
+    saved_model_path = clf.save_model(f'./{model_name}_model')
+    print(f"--- Training finished. Model saved at {saved_model_path} ---")
+
+
+# ==============================================================================
+# 4. MAIN EXECUTION BLOCK
+# ==============================================================================
+
+if __name__ == "__main__":
+    print("--- Starting Round 2 TabNet Model Preparation ---")
+    
+    # Part 1: Generate Data
+    generate_multi_class_insect_data('sugarcane_insect_data_r2.csv', insect_rules)
+    generate_binary_dead_heart_data('sugarcane_deadheart_data_r2.csv', dead_heart_rules)
+    
+    # Part 2: Train Models
+    train_tabnet_model(
+        csv_path='sugarcane_insect_data_r2.csv', 
+        model_name='tabnet_insect'
+    )
+    
+    train_tabnet_model(
+        csv_path='sugarcane_deadheart_data_r2.csv', 
+        model_name='tabnet_disease'
+    )
+    
+    print("\n--- All TabNet models for Round 2 have been prepared successfully! ---")

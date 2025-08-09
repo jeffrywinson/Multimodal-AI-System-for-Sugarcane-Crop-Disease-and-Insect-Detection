@@ -1,18 +1,17 @@
-# app.py
+# app.py (Definitive Final Version for Round 2)
 
 import os
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 
-# Import our updated functions from the new handler
 from model_handler import (
     predict_disease_yolo,
     predict_insect_yolo,
     get_symptom_questions,
     analyze_symptoms_tabnet
 )
-from fusion import fuse_predictions
+from fusion import get_fused_prediction
 
 # --- Flask App Setup ---
 app = Flask(__name__)
@@ -20,61 +19,65 @@ CORS(app)
 app.config['UPLOAD_FOLDER'] = 'static/uploads/'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# --- Routes ---
 @app.route('/')
 def home():
     return render_template('index.html')
 
 @app.route('/analyze', methods=['POST'])
 def analyze_image():
-    # This endpoint is fine, no changes needed here.
-    if 'crop_image' not in request.files or 'insect_image' not in request.files:
-        return jsonify({"error": "Both crop and insect images are required."}), 400
+    """
+    This endpoint handles the initial image upload.
+    It runs the YOLO models and sends back the questions for the next step.
+    """
+    if 'crop_image' not in request.files:
+        return jsonify({"error": "Crop image is required."}), 400
+    
     crop_file = request.files['crop_image']
-    insect_file = request.files['insect_image']
-    if crop_file.filename == '' or insect_file.filename == '':
-        return jsonify({"error": "Please select both files."}), 400
+    if crop_file.filename == '':
+        return jsonify({"error": "Please select an image file."}), 400
+        
+    image_filename = secure_filename(crop_file.filename)
+    image_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
+    crop_file.save(image_path)
 
-    crop_filename = secure_filename(crop_file.filename)
-    insect_filename = secure_filename(insect_file.filename)
-    crop_image_path = os.path.join(app.config['UPLOAD_FOLDER'], crop_filename)
-    insect_image_path = os.path.join(app.config['UPLOAD_FOLDER'], insect_filename)
-    crop_file.save(crop_image_path)
-    insect_file.save(insect_image_path)
+    # Run both YOLO models on the uploaded image
+    yolo_disease_area = predict_disease_yolo(image_path)
+    yolo_insect_count = predict_insect_yolo(image_path)
     
-    yolo_disease_result = predict_disease_yolo(crop_image_path)
-    yolo_insect_result = predict_insect_yolo(insect_image_path)
-    questions = get_symptom_questions()
+    # Get the correctly formatted questions
+    questions = get_symptom_questions() # This now returns a dictionary
     
+    # Send everything the frontend needs for the next step
     response_data = {
-        "image_name": crop_filename, 
-        "yolo_disease": yolo_disease_result,
-        "yolo_insect": yolo_insect_result,
-        "questions": questions
+        "yolo_disease_output": yolo_disease_area,
+        "yolo_insect_output": yolo_insect_count,
+        "questions": questions # Send the dictionary of questions
     }
     return jsonify(response_data)
 
 @app.route('/fuse', methods=['POST'])
 def fuse_all_predictions():
+    """
+    This endpoint receives the YOLO results and the user's answers,
+    runs the TabNet and Fusion models, and returns the final diagnosis.
+    """
     data = request.json
-    image_name = data.get('image_name')
-    yolo_disease = data.get('yolo_disease')
-    yolo_insect = data.get('yolo_insect')
-    answers = data.get('answers')
+    yolo_disease_area = data.get('yolo_disease_output')
+    yolo_insect_count = data.get('yolo_insect_output')
+    disease_answers = data.get('disease_answers')
+    insect_answers = data.get('insect_answers')
 
-    # This call now works because the new analyze_symptoms_tabnet returns two floats
-    tabnet_disease_prob, tabnet_insect_prob = analyze_symptoms_tabnet(answers)
+    # Run TabNet analysis
+    tabnet_disease_prob, tabnet_insect_class = analyze_symptoms_tabnet(disease_answers, insect_answers)
 
-    # The rest of this endpoint correctly passes the data to the fusion model
-    final_output = fuse_predictions(
-        image_name,
-        yolo_disease,
+    # Run the final fusion
+    final_output = get_fused_prediction(
+        yolo_disease_area,
+        yolo_insect_count,
         tabnet_disease_prob,
-        yolo_insect,
-        tabnet_insect_prob
+        tabnet_insect_class
     )
     
-    # This returns the final JSON to the website, which will look like your image
     return jsonify(final_output)
 
 if __name__ == '__main__':

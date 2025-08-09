@@ -1,66 +1,45 @@
-# train_fusion_net.py (Definitive Version - Using Best Parameters from Trial 22)
+# train_fusion_net.py (for Round 2)
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-# --- STEP 1: DEFINE THE WINNING ARCHITECTURE FOUND BY OPTUNA ---
-# These are the exact, best parameters from your Trial 22 log.
-BEST_PARAMS = {
-    'n_layers': 3,
-    'n_units_l0': 45,
-    'n_units_l1': 60,
-    'n_units_l2': 55,
-    'optimizer': 'Adam',
-    'lr': 0.00626330958689155
-}
-# ---------------------------------------------------------------
-
-class FusionNet(nn.Module):
+class FusionNetR2(nn.Module):
     def __init__(self):
-        super(FusionNet, self).__init__()
-        layers = []
-        in_features = 4
-        # Dynamically build the network based on the best params
-        for i in range(BEST_PARAMS['n_layers']):
-            out_features = BEST_PARAMS[f'n_units_l{i}']
-            layers.append(nn.Linear(in_features, out_features))
-            layers.append(nn.ReLU())
-            in_features = out_features
-        layers.append(nn.Linear(in_features, 2))
-        layers.append(nn.Sigmoid())
-        
-        self.network = nn.Sequential(*layers)
+        super(FusionNetR2, self).__init__()
+        # Input layer now takes 6 features
+        self.layer_1 = nn.Linear(6, 32)
+        self.layer_2 = nn.Linear(32, 16)
+        self.output_layer = nn.Linear(16, 2) # Still 2 outputs (disease, insect)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        return self.network(x)
+        x = self.relu(self.layer_1(x))
+        x = self.relu(self.layer_2(x))
+        x = self.sigmoid(self.output_layer(x))
+        return x
 
-# 2. Load Data (same as before)
-df = pd.read_csv('fusion_training_data.csv')
-X = df[['yolo_disease', 'yolo_insect', 'tabnet_disease', 'tabnet_insect']].values
-y = df[['is_disease', 'is_insect']].values
+# Load data
+df = pd.read_csv('fusion_training_data_r2.csv')
+X = df[['yolo_disease', 'yolo_insect', 'tabnet_disease', 'is_esb', 'is_inb', 'is_no_insect']].values
+y = df[['is_disease_true', 'is_insect_true']].values
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+# Convert to PyTorch Tensors
 X_train = torch.tensor(X_train, dtype=torch.float32)
 y_train = torch.tensor(y_train, dtype=torch.float32)
 X_test = torch.tensor(X_test, dtype=torch.float32)
 y_test = torch.tensor(y_test, dtype=torch.float32)
 
-# 3. Training Loop with the Best Parameters
-model = FusionNet()
+# Training Loop
+model = FusionNetR2()
 criterion = nn.BCELoss()
-optimizer_class = getattr(optim, BEST_PARAMS['optimizer'])
-optimizer = optimizer_class(model.parameters(), lr=BEST_PARAMS['lr'])
-scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=15)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+epochs = 200
 
-# Give it plenty of time to train to its peak
-epochs = 1500 
-
-print(f"--- Training Final Model with Best Parameters from Optuna ---")
-print(f"Parameters: {BEST_PARAMS}")
-
+print("--- Training Round 2 Fusion Network ---")
 for epoch in range(epochs):
     model.train()
     optimizer.zero_grad()
@@ -69,19 +48,13 @@ for epoch in range(epochs):
     loss.backward()
     optimizer.step()
 
-    model.eval()
-    with torch.no_grad():
-        test_outputs = model(X_test)
-        test_loss = criterion(test_outputs, y_test)
-    
-    scheduler.step(test_loss)
-
-    if (epoch + 1) % 50 == 0:
+    if (epoch + 1) % 20 == 0:
+        model.eval()
         with torch.no_grad():
+            test_outputs = model(X_test)
             predicted = (test_outputs > 0.5).float()
             accuracy = (predicted == y_test).float().mean()
             print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}, Test Accuracy: {accuracy.item():.4f}')
 
-# 4. Save the final, best model
-torch.save(model.state_dict(), 'fusion_model.pth')
-print("--- Definitive fusion model training complete. Saved as fusion_model.pth ---")
+torch.save(model.state_dict(), 'fusion_model_r2.pth')
+print("--- Round 2 fusion model saved as fusion_model_r2.pth ---")

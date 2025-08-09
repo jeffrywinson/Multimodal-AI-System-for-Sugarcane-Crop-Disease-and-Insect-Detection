@@ -1,20 +1,26 @@
-# predict_insect_tabnet.py
+# predict_insect_tabnet.py (Updated for Round 2)
 import numpy as np
 from pytorch_tabnet.tab_model import TabNetClassifier
 import argparse
 
 def predict(answers_list):
-    # This encoding must match the training script: 'No' -> 0, 'Yes' -> 1
     encoded_answers = [1 if ans.strip().lower() == 'yes' else 0 for ans in answers_list]
-
+    
     clf = TabNetClassifier()
-    clf.load_model('./tabnet/tabnet_insect_model.zip') # The only change is this line
-
-    # Predict probabilities. It returns a value for "Not Present" and "Present". We want the second one.
-    # The output will be a number like 0.842
-    prediction_proba = clf.predict_proba(np.array([encoded_answers]))
-    probability_present = prediction_proba[0][1]
-    print(probability_present)
+    clf.load_model('./tabnet/tabnet_insect_model.zip')
+    
+    # The output from predict() is now an integer representing the class
+    prediction_index = clf.predict(np.array([encoded_answers]))[0]
+    
+    # We need to map the index back to the class name
+    # This order comes from how LabelEncoder sorts the strings:
+    # 'Early Shoot Borer' (0), 'Internode Borer' (1), 'No Insect' (2)
+    class_mapping = {0: "Early Shoot Borer", 1: "Internode Borer", 2: "No Insect"}
+    
+    predicted_class_name = class_mapping.get(prediction_index, "Unknown")
+    
+    # We will print the class name. The fusion model will need to handle this.
+    print(predicted_class_name)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Predict insect presence from answers.")
