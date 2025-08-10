@@ -9,223 +9,71 @@
 </head>
 <body>
 
-    <header class="header">
-        <h1>🧑‍🌾 Agri-AI Diagnostics</h1>
-        <p class="lead">A Multimodal AI System for Sugarcane Health</p>
-    </header>
+    <div class="header">
+        <div class="container-fluid d-flex align-items-center">
+            <div class="text-center flex-grow-1">
+                <h1 data-translate-key="headerTitle">🧑‍🌾 Agri-AI Diagnostics</h1>
+                <p class="lead mb-0" data-translate-key="headerLead">Upload a crop or insect image for a complete analysis.</p>
+            </div>
+            <!-- NEW: Language Selector Dropdown -->
+            <div class="dropdown language-selector">
+                <button class="btn btn-light dropdown-toggle" type="button" id="languageDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-translate-key="translateButton">
+                    Translate
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageDropdown">
+                    <li><a class="dropdown-item" href="#" onclick="setLanguage('en')">English</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setLanguage('ta')">தமிழ் (Tamil)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setLanguage('hi')">हिन्दी (Hindi)</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
 
     <div class="container main-container">
         <div class="card" id="upload-card">
             <div class="card-body p-4">
-                <h5 class="card-title">Step 1: Upload Crop Image</h5>
+                <h5 class="card-title" data-translate-key="step1Title">Step 1: Upload Image</h5>
                 <form id="upload-form">
                     <div class="mb-3">
-                        <label for="crop-image-input" class="form-label fw-semibold">🌿 Select a single image showing the crop condition:</label>
-                        <input class="form-control" type="file" id="crop-image-input" name="crop_image" accept="image/*" required>
-                        <img id="image-preview" src="#" alt="Image Preview" class="image-preview"/>
+                        <label for="image-input" class="form-label fw-semibold" data-translate-key="uploadLabel">🌿 Upload Image (Crop or Insect)</label>
+                        <input class="form-control" type="file" id="image-input" accept="image/*" required>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        Analyze Image & Get Questions
-                    </button>
+                    <button type="submit" class="btn btn-primary w-100" data-translate-key="analyzeButton">Analyze Image</button>
                 </form>
+                 <div class="d-flex justify-content-center mt-3">
+                    <div class="spinner-border text-success" role="status" id="spinner">
+                        <span class="visually-hidden" data-translate-key="loadingSpinner">Loading...</span>
+                    </div>
+                 </div>
             </div>
         </div>
 
         <div class="card" id="symptom-card">
             <div class="card-body p-4">
-                <h5 class="card-title">Step 2: Answer Symptom Questions</h5>
-                <p class="text-muted small">Please provide additional information about the crop's condition.</p>
-                <form id="symptom-form">
-                    <div class="question-section">
-                        <h6>Dead Heart Symptoms</h6>
-                        <div id="disease-questions-container"></div>
-                    </div>
-                    <div class="question-section">
-                        <h6>Insect (Borer) Symptoms</h6>
-                        <div id="insect-questions-container"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100 mt-3">
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        Get Final Diagnosis
-                    </button>
-                </form>
+                <h5 class="card-title" data-translate-key="step2Title">Step 2: Answer a Few Questions</h5>
+                <p class="text-muted small" data-translate-key="step2Lead">Please provide additional information based on the image below and your observations.</p>
+                
+                <div class="text-center mb-4">
+                    <img id="uploaded-image-preview" src="" alt="Uploaded Image Preview" class="img-fluid rounded shadow-sm" style="max-height: 250px; display: none; border: 3px solid #eee;">
+                </div>
+
+                <form id="symptom-form"></form>
+                <button id="submit-symptoms" class="btn btn-success w-100 mt-3" data-translate-key="getDiagnosisButton">Get Final Diagnosis</button>
             </div>
         </div>
 
         <div class="card" id="results-card">
+            <div class="card-header fw-bold bg-light" data-translate-key="resultsTitle">Final Analysis</div>
             <div class="card-body p-4">
-                <h5 class="card-title">Final Diagnosis</h5>
-                <div id="results-content"></div>
-                <button onclick="window.location.reload();" class="btn btn-secondary w-100 mt-3">Start New Analysis</button>
+                <div id="results-content">
+                </div>
+                <button class="btn btn-secondary w-100 mt-4" id="reset-btn" data-translate-key="resetButton">Analyze Another Crop</button>
             </div>
         </div>
     </div>
 
-    <script>
-        // Store model outputs globally to pass between steps
-        let yoloDiseaseOutput = null;
-        let yoloInsectOutput = null;
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../static/script.js"></script>
 
-        const uploadForm = document.getElementById('upload-form');
-        const symptomForm = document.getElementById('symptom-form');
-        const imageInput = document.getElementById('crop-image-input');
-        const imagePreview = document.getElementById('image-preview');
-
-        // Image preview logic
-        imageInput.addEventListener('change', function() {
-            if (this.files && this.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    imagePreview.src = e.target.result;
-                    imagePreview.style.display = 'block';
-                }
-                reader.readAsDataURL(this.files[0]);
-            }
-        });
-        
-        // Handle Step 1: Image Analysis
-        uploadForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const spinner = this.querySelector('.spinner-border');
-            spinner.style.display = 'inline-block';
-
-            const formData = new FormData();
-            formData.append('crop_image', imageInput.files[0]);
-
-            try {
-                const response = await fetch('/analyze', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) { throw new Error('Server error during image analysis.'); }
-                const data = await response.json();
-                
-                yoloDiseaseOutput = data.yolo_disease_output;
-                yoloInsectOutput = data.yolo_insect_output;
-
-                displayQuestions(data.questions);
-
-                document.getElementById('upload-card').style.display = 'none';
-                document.getElementById('symptom-card').style.display = 'block';
-
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Could not analyze image. Please check the server logs.');
-            } finally {
-                spinner.style.display = 'none';
-            }
-        });
-
-        function displayQuestions(questionsData) {
-            const diseaseContainer = document.getElementById('disease-questions-container');
-            const insectContainer = document.getElementById('insect-questions-container');
-            diseaseContainer.innerHTML = '';
-            insectContainer.innerHTML = '';
-
-            // This function now correctly handles the data format from the backend
-            questionsData.disease_questions.forEach((question, index) => {
-                const questionHTML = `
-                    <div class="mb-2">
-                        <p class="mb-1">${index + 1}. ${question.text}</p>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="disease_q_${index}" id="disease_yes_${index}" value="yes" required>
-                            <label class="form-check-label" for="disease_yes_${index}">Yes</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="disease_q_${index}" id="disease_no_${index}" value="no" checked>
-                            <label class="form-check-label" for="disease_no_${index}">No</label>
-                        </div>
-                    </div>`;
-                diseaseContainer.innerHTML += questionHTML;
-            });
-
-            questionsData.insect_questions.forEach((question, index) => {
-                const questionHTML = `
-                    <div class="mb-2">
-                        <p class="mb-1">${index + 1}. ${question.text}</p>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="insect_q_${index}" id="insect_yes_${index}" value="yes" required>
-                            <label class="form-check-label" for="insect_yes_${index}">Yes</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="insect_q_${index}" id="insect_no_${index}" value="no" checked>
-                            <label class="form-check-label" for="insect_no_${index}">No</label>
-                        </div>
-                    </div>`;
-                insectContainer.innerHTML += questionHTML;
-            });
-        }
-
-        // Handle Step 2: Get Final Diagnosis
-        symptomForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const spinner = this.querySelector('.spinner-border');
-            spinner.style.display = 'inline-block';
-
-            // Correctly gather all answers from the uniquely named radio buttons
-            const diseaseAnswers = Array.from(document.querySelectorAll('#disease-questions-container [type="radio"]:checked')).map(input => input.value);
-            const insectAnswers = Array.from(document.querySelectorAll('#insect-questions-container [type="radio"]:checked')).map(input => input.value);
-
-            const payload = {
-                yolo_disease_output: yoloDiseaseOutput,
-                yolo_insect_output: yoloInsectOutput,
-                disease_answers: diseaseAnswers,
-                insect_answers: insectAnswers
-            };
-
-            try {
-                const response = await fetch('/fuse', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) { throw new Error('Server error during fusion process.'); }
-                const finalData = await response.json();
-                
-                displayResults(finalData);
-                
-                document.getElementById('symptom-card').style.display = 'none';
-                document.getElementById('results-card').style.display = 'block';
-
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Could not get final diagnosis. Please check the server logs.');
-            } finally {
-                spinner.style.display = 'none';
-            }
-        });
-
-        function displayResults(data) {
-            const resultsContainer = document.getElementById('results-content');
-            const disease = data.dead_heart_analysis;
-            const insect = data.insect_analysis;
-
-            resultsContainer.innerHTML = `
-                <div class="alert alert-info">
-                    <h6 class="alert-heading">Dead Heart Analysis</h6>
-                    <p class="mb-1"><strong>Final Diagnosis:</strong> <span class="fw-bold">${disease.final_diagnosis}</span></p>
-                    <hr>
-                    <p class="mb-0 small text-muted">
-                        YOLO Model (Area %): ${disease.yolo_output} | 
-                        TabNet Model (Prob): ${disease.tabnet_probability} |
-                        Fused Model (Confidence): ${disease.fused_probability}
-                    </p>
-                </div>
-                <div class="alert alert-warning">
-                    <h6 class="alert-heading">Insect Analysis</h6>
-                    <p class="mb-1"><strong>Final Diagnosis:</strong> <span class="fw-bold">${insect.final_diagnosis}</span></p>
-                    <hr>
-                    <p class="mb-0 small text-muted">
-                        YOLO Model (Count): ${insect.yolo_output} | 
-                        TabNet Model (Class): ${insect.tabnet_classification} |
-                        Fused Model (Confidence): ${insect.fused_probability}
-                    </p>
-                </div>
-            `;
-        }
-    </script>
 </body>
 </html>
