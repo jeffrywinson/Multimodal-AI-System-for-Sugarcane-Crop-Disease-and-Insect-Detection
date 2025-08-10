@@ -1,70 +1,87 @@
+# In fusion.py
+
 import math
 
 def get_fused_prediction_rules(yolo_disease_area, yolo_insect_count, tabnet_disease_prob, tabnet_insect_class):
     """
-    Takes all model outputs and uses a simple rule-based system (if/else)
-    to determine the final diagnosis.
+    UPDATED VERSION:
+    1. Fixes mismatched key names for fused probability.
+    2. Calculates a certainty score for the insect diagnosis.
+    3. Makes a primary decision and returns ONLY the most relevant analysis.
     """
     
-    # --- 1. Rule-Based Disease Diagnosis ---
-    
-    # Normalize YOLO area to a 0-1 score to combine with TabNet's probability.
-    # We'll cap the score at 1.0. A value of 0.2 area or more gets a max score.
+    # --- 1. Disease Score Calculation ---
     normalized_yolo_score = min(yolo_disease_area / 0.2, 1.0)
-    
-    # Create a weighted score. Give visual evidence from YOLO more weight.
-    # Weighting: 60% YOLO, 40% TabNet
     disease_score = (normalized_yolo_score * 0.6) + (tabnet_disease_prob * 0.4)
     
-    # Apply a simple threshold
     if disease_score > 0.5:
-        disease_diagnosis = "Present"
+        disease_diagnosis = "Dead Heart Present" # More specific diagnosis
     else:
-        disease_diagnosis = "Not Present"
+        disease_diagnosis = "Healthy"
         
-    # --- 2. Rule-Based Insect Diagnosis ---
-    
-    decision_rule = "" # To explain the logic in the output
+    disease_analysis = {
+        "yolo_output": f"{yolo_disease_area:.4f} area",
+        "tabnet_probability": f"{tabnet_disease_prob:.4f}",
+        "fused_probability": f"{disease_score:.4f}",  # FIX: Renamed key to match JS
+        "final_diagnosis": disease_diagnosis
+    }
+        
+    # --- 2. Insect Diagnosis Calculation ---
+    decision_rule = ""
+    insect_probability = 0.0 # FIX: Added a probability score for insects
 
     if yolo_insect_count > 0:
-        # If we SEE an insect, we prioritize that visual evidence.
         if tabnet_insect_class != "No Insect":
-            # Best case: Visuals and symptoms agree an insect is present.
-            # We trust TabNet for the specific type.
             insect_diagnosis = tabnet_insect_class
             decision_rule = "Visual evidence confirmed by symptoms."
+            insect_probability = 0.95 # High confidence
         else:
-            # Conflict: We see an insect, but symptoms don't match a known type.
-            # We must report the insect's presence but note the uncertainty.
-            insect_diagnosis = "Insect Detected (Type Unconfirmed by Symptoms)"
+            insect_diagnosis = "Insect Detected (Type Unconfirmed)"
             decision_rule = "Visual evidence overrides conflicting symptom data."
+            insect_probability = 0.85 # Still high confidence due to visual
             
     else: # yolo_insect_count == 0
-        # If we DON'T see an insect, we rely on the symptom data from TabNet.
         if tabnet_insect_class != "No Insect":
-            # It's possible for borers to be present without being visible on the exterior.
             insect_diagnosis = tabnet_insect_class
-            decision_rule = "Symptom-based detection without direct visual confirmation."
+            decision_rule = "Symptom-based detection without visual confirmation."
+            insect_probability = 0.70 # Moderate confidence
         else:
-            # No visuals and no symptoms.
-            insect_diagnosis = "Not Present"
+            insect_diagnosis = "Healthy"
             decision_rule = "No visual or symptom-based evidence found."
+            insect_probability = 1.0 - tabnet_disease_prob # Confidence in being healthy
 
-    # --- 3. Format Final Output ---
-    # The structure is kept the same to ensure the frontend still works.
-    
-    final_output = {
-        "dead_heart_analysis": {
-            "yolo_output": f"{yolo_disease_area:.4f} area",
-            "tabnet_probability": f"{tabnet_disease_prob:.4f}",
-            "rule_based_score": f"{disease_score:.4f}", # Replaces 'fused_probability'
-            "final_diagnosis": disease_diagnosis
-        },
-        "insect_analysis": {
-            "yolo_output": f"{yolo_insect_count} detections",
-            "tabnet_classification": tabnet_insect_class,
-            "decision_logic": decision_rule, # Explains how the insect decision was made
-            "final_diagnosis": insect_diagnosis
-        }
+    insect_analysis = {
+        "yolo_output": f"{yolo_insect_count} detections",
+        "tabnet_classification": tabnet_insect_class,
+        "decision_logic": decision_rule,
+        "fused_probability": f"{insect_probability:.4f}", # FIX: Added the new key
+        "final_diagnosis": insect_diagnosis
     }
+
+    # --- 3. Primary Decision Logic ---
+    # Decide whether to show the disease OR the insect analysis.
+    # We prioritize showing the result with the higher visual evidence.
+    
+    final_output = {}
+    if yolo_disease_area > 0.01 or yolo_insect_count > 0:
+        # If there's strong visual evidence for either, pick the stronger one
+        if (yolo_disease_area * 3) > yolo_insect_count: # Weight disease area more
+             final_output['analysis_type'] = 'disease'
+             final_output['result'] = disease_analysis
+        else:
+            final_output['analysis_type'] = 'insect'
+            final_output['result'] = insect_analysis
+    else:
+        # If no visual evidence, rely on the TabNet scores
+        if tabnet_disease_prob > 0.5:
+            final_output['analysis_type'] = 'disease'
+            final_output['result'] = disease_analysis
+        elif tabnet_insect_class != "No Insect":
+             final_output['analysis_type'] = 'insect'
+             final_output['result'] = insect_analysis
+        else:
+            # If still nothing, default to showing the disease analysis as "Healthy"
+            final_output['analysis_type'] = 'disease'
+            final_output['result'] = disease_analysis
+
     return final_output

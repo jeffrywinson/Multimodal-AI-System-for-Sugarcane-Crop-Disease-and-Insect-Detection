@@ -19,8 +19,8 @@ const translations = {
         getDiagnosisButton: "Get Final Diagnosis",
         resultsTitle: "Final Analysis",
         resetButton: "Analyze Another Crop",
-        diseaseSectionTitle: "Disease Symptoms",
-        insectSectionTitle: "Insect Symptoms",
+        diseaseSectionTitle: "Dead-Heart Symptoms",
+        insectSectionTitle: "Larva Symptoms",
         yes: "Yes",
         no: "No",
         diseaseAnalysisTitle: "🌿 Disease Analysis (Dead Heart)",
@@ -77,8 +77,8 @@ const translations = {
         getDiagnosisButton: "இறுதி நோய் கண்டறிதலைப் பெறுக",
         resultsTitle: "இறுதி பகுப்பாய்வு",
         resetButton: "மற்றொரு பயிரை பகுப்பாய்வு செய்யவும்",
-        diseaseSectionTitle: "நோய் அறிகுறிகள்",
-        insectSectionTitle: "பூச்சி அறிகுறிகள்",
+        diseaseSectionTitle: "இறந்த இதய அறிகுறிகள்",
+        insectSectionTitle: "லார்வா அறிகுறிகள்",
         yes: "ஆம்",
         no: "இல்லை",
         diseaseAnalysisTitle: "🌿 நோய் பகுப்பாய்வு ( இறந்த இதயம்)",
@@ -135,8 +135,8 @@ const translations = {
         getDiagnosisButton: "अंतिम निदान प्राप्त करें",
         resultsTitle: "अंतिम विश्लेषण",
         resetButton: "दूसरी फसल का विश्लेषण करें",
-        diseaseSectionTitle: "रोग के लक्षण",
-        insectSectionTitle: "कीट के लक्षण",
+        diseaseSectionTitle: "डेड-हार्ट के लक्षण",
+        insectSectionTitle: "लार्वा के लक्षण",
         yes: "हाँ",
         no: "नहीं",
         diseaseAnalysisTitle: "🌿 रोग विश्लेषण (डेड हार्ट)",
@@ -308,36 +308,54 @@ function createQuestionElement(q, prefix, index) {
     return formGroup;
 }
 
-function displayResults(results) {
-    const disease = results.dead_heart_analysis;
-    const insect = results.insect_analysis;
+// In script.js
+
+function displayResults(data) {
     const lang = translations[currentLanguage];
+    const resultsContent = document.getElementById('results-content');
+    resultsContent.innerHTML = ''; // Clear previous results
+
+    // Helper function to determine text color based on diagnosis
     const getConfidenceClass = (diag) => {
         if (!diag) return "text-muted";
-        if (diag.toLowerCase().includes("present") || diag.toLowerCase().includes("borer")) return "text-danger fw-bold";
-        return "text-success";
+        if (diag.toLowerCase().includes("present") || diag.toLowerCase().includes("borer") || diag.toLowerCase().includes("unconfirmed")) {
+            return "text-danger fw-bold";
+        }
+        if (diag.toLowerCase().includes("healthy") || diag.toLowerCase().includes("not present")) {
+            return "text-success fw-bold";
+        }
+        return "text-dark";
     };
-    resultsContent.innerHTML = `
-        <div class="mb-3">
-            <h6>${lang.diseaseAnalysisTitle}</h6>
-            <p class="mb-1"><strong>${lang.finalDiagnosisLabel}</strong> <span class="${getConfidenceClass(disease.final_diagnosis)}">${disease.final_diagnosis}</span></p>
-            <ul class="list-unstyled small text-muted">
-                <li>${lang.visualDetectionLabel} ${disease.yolo_output}</li>
-                <li>${lang.symptomAnalysisLabel} Prob. ${disease.tabnet_probability}</li>
-                <li>${lang.fusedCertaintyLabel} Prob. ${disease.fused_probability}</li>
-            </ul>
-        </div>
-        <hr>
-        <div>
-            <h6>${lang.insectAnalysisTitle}</h6>
-            <p class="mb-1"><strong>${lang.finalDiagnosisLabel}</strong> <span class="${getConfidenceClass(insect.final_diagnosis)}">${insect.final_diagnosis}</span></p>
-            <ul class="list-unstyled small text-muted">
-                <li>${lang.visualDetectionLabel} ${insect.yolo_output}</li>
-                <li>${lang.symptomAnalysisLabel} ${insect.tabnet_classification}</li>
-                <li>${lang.fusedCertaintyLabel} Prob. ${insect.fused_probability}</li>
-            </ul>
-        </div>
-    `;
+
+    // Check the analysis type sent from the backend
+    if (data.analysis_type === 'disease') {
+        const disease = data.result;
+        resultsContent.innerHTML = `
+            <div class="mb-3">
+                <h6>${lang.diseaseAnalysisTitle}</h6>
+                <p class="mb-1"><strong>${lang.finalDiagnosisLabel}</strong> <span class="${getConfidenceClass(disease.final_diagnosis)}">${disease.final_diagnosis}</span></p>
+                <ul class="list-unstyled small text-muted">
+                    <li>${lang.visualDetectionLabel} ${disease.yolo_output}</li>
+                    <li>${lang.symptomAnalysisLabel} Prob. ${disease.tabnet_probability}</li>
+                    <li>${lang.fusedCertaintyLabel} Prob. ${disease.fused_probability}</li>
+                </ul>
+            </div>
+        `;
+    } else if (data.analysis_type === 'insect') {
+        const insect = data.result;
+        resultsContent.innerHTML = `
+            <div>
+                <h6>${lang.insectAnalysisTitle}</h6>
+                <p class="mb-1"><strong>${lang.finalDiagnosisLabel}</strong> <span class="${getConfidenceClass(insect.final_diagnosis)}">${insect.final_diagnosis}</span></p>
+                <ul class="list-unstyled small text-muted">
+                    <li>${lang.visualDetectionLabel} ${insect.yolo_output}</li>
+                    <li>${lang.symptomAnalysisLabel} ${insect.tabnet_classification}</li>
+                    <li>${lang.fusedCertaintyLabel} Prob. ${insect.fused_probability}</li>
+                </ul>
+            </div>
+        `;
+    }
 }
+
 
 document.addEventListener('DOMContentLoaded', () => { translatePage(); });
