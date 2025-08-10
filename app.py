@@ -4,16 +4,15 @@ import os
 from flask import Flask, request, jsonify, render_template, url_for
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
-import json # Make sure json is imported
+import json
 
-# Your custom model functions
 from model_handler import (
     predict_disease_yolo,
     predict_insect_yolo,
     get_symptom_questions,
     analyze_symptoms_tabnet
 )
-# Corrected import for the final fusion function
+# This is the correct import for your final fusion model
 from fusion import get_fused_prediction_rules
 
 # --- Flask App Setup ---
@@ -39,15 +38,13 @@ def analyze_image():
     image_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
     image_file.save(image_path)
 
-    # Run BOTH models on the SAME image
     yolo_disease_area = predict_disease_yolo(image_path)
     yolo_insect_count = predict_insect_yolo(image_path)
     
     all_questions = get_symptom_questions()
     questions_to_send = {}
-    image_type = "Analysis Result" # Default title
+    image_type = "Analysis Result"
 
-    # Logic to decide which questions to send
     if yolo_disease_area > 0:
         questions_to_send['disease_questions'] = all_questions['disease_questions']
         image_type = "Image appears to show Dead Heart symptoms."
@@ -58,10 +55,9 @@ def analyze_image():
         else:
              image_type = "Image appears to show Insects."
     
-    # If YOLO finds nothing, send both sets of questions for a manual check
     if not questions_to_send:
         questions_to_send = all_questions
-        image_type = "No immediate issues detected by YOLO. Please answer questions for a deeper analysis."
+        image_type = "No immediate issues detected. Please answer questions for a deeper analysis."
 
     image_url = url_for('static', filename=f'uploads/{image_filename}')
 

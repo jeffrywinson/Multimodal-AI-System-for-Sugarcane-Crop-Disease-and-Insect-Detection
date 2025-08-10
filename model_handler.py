@@ -1,5 +1,4 @@
-# model_handler.py (Definitive Final Version for Round 2)
-
+# model_handler.py (Definitive Final Version)
 import pandas as pd
 import numpy as np
 from pytorch_tabnet.tab_model import TabNetClassifier
@@ -74,31 +73,28 @@ dead_heart_rules = [
 ]
 
 
-# --- MODEL LOADING (Done once when the app starts) ---
+# --- MODEL LOADING ---
 print("--- Loading all models into memory... ---")
-TABNET_DISEASE_MODEL = TabNetClassifier()
-TABNET_DISEASE_MODEL.load_model('./tabnet/tabnet_disease_model.zip')
-
-TABNET_INSECT_MODEL = TabNetClassifier()
-TABNET_INSECT_MODEL.load_model('./tabnet/tabnet_insect_model.zip')
-
+TABNET_DISEASE_MODEL = TabNetClassifier(); TABNET_DISEASE_MODEL.load_model('./tabnet/tabnet_disease_model.zip')
+TABNET_INSECT_MODEL = TabNetClassifier(); TABNET_INSECT_MODEL.load_model('./tabnet/tabnet_insect_model.zip')
 YOLO_DISEASE_MODEL = YOLO("./YOLOv8s-seg/best.pt")
 YOLO_INSECT_MODEL = YOLO("./YOLOv8s/yolov8s_insect_detection_best.pt")
 print("--- All models loaded successfully. ---")
 
 
+# --- PREDICTION FUNCTIONS ---
+
 # ==============================================================================
-# 2. DEFINE THE PREDICTION FUNCTIONS
+# 2. DEFINE THE PREDICTION FUNCTIONS (FINAL VERSION)
 # ==============================================================================
 
 def get_symptom_questions():
     """
-    Returns a structured dictionary of question objects for the frontend.
-    THIS IS THE CORRECTED FUNCTION.
+    Returns a structured dictionary of questions with unique, language-independent keys.
+    THIS IS THE KEY FIX FOR THE TRANSLATION BUG.
     """
-    # Instead of a list of strings, create a list of objects.
-    disease_question_list = [{"text": rule[0]} for rule in dead_heart_rules]
-    insect_question_list = [{"text": rule[0]} for rule in insect_rules]
+    disease_question_list = [{"key": f"dh_q{i+1}", "text": rule[0]} for i, rule in enumerate(dead_heart_rules)]
+    insect_question_list = [{"key": f"in_q{i+1}", "text": rule[0]} for i, rule in enumerate(insect_rules)]
     
     return {
         "disease_questions": disease_question_list,
@@ -106,45 +102,32 @@ def get_symptom_questions():
     }
 
 def predict_disease_yolo(image_path):
-    """Runs the YOLO segmentation model and returns the disease area percentage."""
+    """Returns disease area percentage."""
     results = YOLO_DISEASE_MODEL.predict(image_path, verbose=False)
-    if results[0].masks is not None and len(results[0].masks) > 0:
-        h, w = results[0].orig_shape
-        image_area = h * w
+    if results[0].masks:
+        h, w = results[0].orig_shape; image_area = h * w
         total_disease_area = sum(mask.data.sum() for mask in results[0].masks)
         return (total_disease_area / image_area).item()
     return 0.0
 
 def predict_insect_yolo(image_path):
-    """Runs the YOLO detection model and returns the number of insects found."""
+    """Returns the number of insects found."""
     results = YOLO_INSECT_MODEL.predict(image_path, verbose=False)
     return float(len(results[0].boxes))
 
 def analyze_symptoms_tabnet(disease_answers, insect_answers):
-    """
-    Takes two lists of answers and returns the TabNet model predictions.
-    This now correctly handles the inputs.
-    """
-    # --- Process Disease/Dead Heart Answers ---
-    # Add a check for None to prevent the 'iterable' crash
-    if disease_answers is None: disease_answers = []
-    # Ensure the input array has the correct shape (1, 30) even if empty
-    disease_input_array = np.array([[1 if ans and ans.lower() == 'yes' else 0 for ans in disease_answers]]).reshape(1, -1)
-    if disease_input_array.shape[1] == 0: # Handle case of empty list
-        disease_input_array = np.zeros((1, 30))
-        
-    disease_probs = TABNET_DISEASE_MODEL.predict_proba(disease_input_array)
-    tabnet_disease_prob = disease_probs[0][1]
-
-    # --- Process Insect Answers ---
-    if insect_answers is None: insect_answers = []
-    insect_input_array = np.array([[1 if ans and ans.lower() == 'yes' else 0 for ans in insect_answers]]).reshape(1, -1)
-    if insect_input_array.shape[1] == 0:
-        insect_input_array = np.zeros((1, 30))
-        
-    prediction_index = TABNET_INSECT_MODEL.predict(insect_input_array)[0]
+    """Takes answer lists and returns TabNet model predictions."""
+    disease_answers = disease_answers or []
+    insect_answers = insect_answers or []
     
-    class_mapping = {0: "Early Shoot Borer", 1: "Internode Borer", 2: "No Insect"}
-    tabnet_insect_class = class_mapping.get(prediction_index, "No Insect")
+    disease_input = np.array([[1 if ans and ans.lower() == 'yes' else 0 for ans in disease_answers]]).reshape(1, -1)
+    if disease_input.shape[1] == 0: disease_input = np.zeros((1, 30))
+    disease_prob = TABNET_DISEASE_MODEL.predict_proba(disease_input)[0][1]
 
-    return tabnet_disease_prob, tabnet_insect_class
+    insect_input = np.array([[1 if ans and ans.lower() == 'yes' else 0 for ans in insect_answers]]).reshape(1, -1)
+    if insect_input.shape[1] == 0: insect_input = np.zeros((1, 30))
+    pred_index = TABNET_INSECT_MODEL.predict(insect_input)[0]
+    class_map = {0: "Early Shoot Borer", 1: "Internode Borer", 2: "No Insect"}
+    insect_class = class_map.get(pred_index, "No Insect")
+    
+    return disease_prob, insect_class

@@ -210,44 +210,37 @@ const submitSymptomsBtn = document.getElementById('submit-symptoms');
 const resultsCard = document.getElementById('results-card');
 const resultsContent = document.getElementById('results-content');
 const uploadedImagePreview = document.getElementById('uploaded-image-preview');
-const imageTypeText = document.getElementById('image-type-text'); // Make sure your HTML has this ID if you use it
+const imageTypeText = document.querySelector('#symptom-card .text-muted'); // More specific selector
 
 let analysisData = {};
 
 uploadForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!imageInput.files[0]) { alert("Please select an image to analyze."); return; }
+    if (!imageInput.files[0]) { alert("Please select an image."); return; }
     spinner.style.display = 'block';
     const formData = new FormData();
     formData.append('image_file', imageInput.files[0]);
     try {
         const response = await fetch('/analyze', { method: 'POST', body: formData });
-        if (response.ok) {
-            analysisData = await response.json();
-            uploadCard.style.display = 'none';
-            if (analysisData.image_url) {
-                uploadedImagePreview.src = analysisData.image_url;
-                uploadedImagePreview.style.display = 'block';
-            }
-            if (imageTypeText) {
-                imageTypeText.textContent = analysisData.image_content_type || '';
-            }
-            displayQuestions(analysisData);
-            symptomCard.style.display = 'block';
-        } else { alert('Error analyzing images. Please check the server.'); }
+        if (!response.ok) throw new Error('Server error during image analysis.');
+        analysisData = await response.json();
+        uploadCard.style.display = 'none';
+        uploadedImagePreview.src = analysisData.image_url;
+        uploadedImagePreview.style.display = 'block';
+        imageTypeText.textContent = analysisData.image_content_type;
+        displayQuestions(analysisData);
+        symptomCard.style.display = 'block';
     } catch (error) {
         console.error('Fetch Error:', error);
-        alert('Could not connect to the server. Is the Python app running?');
+        alert('Could not connect to the server.');
     } finally {
         spinner.style.display = 'none';
     }
 });
 
 submitSymptomsBtn.addEventListener('click', async () => {
-    // Correctly gather answers into two separate lists
     const diseaseAnswers = Array.from(document.querySelectorAll('[name^="disease_"]:checked')).map(input => input.value);
     const insectAnswers = Array.from(document.querySelectorAll('[name^="insect_"]:checked')).map(input => input.value);
-    
     const payload = {
         yolo_disease_output: analysisData.yolo_disease_output,
         yolo_insect_output: analysisData.yolo_insect_output,
@@ -260,41 +253,32 @@ submitSymptomsBtn.addEventListener('click', async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        if (response.ok) {
-            const finalResults = await response.json();
-            analysisData.results = finalResults;
-            symptomCard.style.display = 'none';
-            displayResults(finalResults);
-            resultsCard.style.display = 'block';
-        } else { alert('Error generating final diagnosis.'); }
+        if (!response.ok) throw new Error('Server error during fusion.');
+        const finalResults = await response.json();
+        analysisData.results = finalResults;
+        symptomCard.style.display = 'none';
+        displayResults(finalResults);
+        resultsCard.style.display = 'block';
     } catch (error) {
         console.error('Fetch Error:', error);
-        alert('Could not connect to the server for fusion.');
+        alert('Could not get final diagnosis.');
     }
 });
 
-resetBtn.addEventListener('click', () => {
-    window.location.reload();
-});
+resetBtn.addEventListener('click', () => { window.location.reload(); });
 
 function displayQuestions(data) {
     symptomForm.innerHTML = '';
     let questionCount = 0;
-    
     if (data.questions && data.questions.disease_questions) {
         const diseaseSection = createSection('diseaseSectionTitle');
-        // The backend now sends a list of objects like {text: "Question?"}
-        data.questions.disease_questions.forEach((q, index) => {
-            diseaseSection.appendChild(createQuestionElement(q, 'disease_', index));
-        });
+        data.questions.disease_questions.forEach((q, i) => diseaseSection.appendChild(createQuestionElement(q, 'disease_', i)));
         symptomForm.appendChild(diseaseSection);
         questionCount += data.questions.disease_questions.length;
     }
     if (data.questions && data.questions.insect_questions) {
         const insectSection = createSection('insectSectionTitle');
-        data.questions.insect_questions.forEach((q, index) => {
-            insectSection.appendChild(createQuestionElement(q, 'insect_', index));
-        });
+        data.questions.insect_questions.forEach((q, i) => insectSection.appendChild(createQuestionElement(q, 'insect_', i)));
         symptomForm.appendChild(insectSection);
         questionCount += data.questions.insect_questions.length;
     }
@@ -304,78 +288,56 @@ function displayQuestions(data) {
 function createSection(titleKey) {
     const section = document.createElement('div');
     section.className = 'question-section';
-    const h6 = document.createElement('h6');
-    h6.innerText = translations[currentLanguage][titleKey] || translations['en'][titleKey];
-    section.appendChild(h6);
+    section.innerHTML = `<h6>${translations[currentLanguage][titleKey]}</h6>`;
     return section;
 }
 
 function createQuestionElement(q, prefix, index) {
-    // FIX: The name is now unique for each question, allowing independent selection.
-    // We access `q.text` because the backend now sends a list of objects.
-    const uniqueId = prefix + index; 
+    const uniqueId = prefix + q.key; // Use the key from the backend
     const formGroup = document.createElement('div');
     formGroup.className = 'mb-3';
-    
-    const label = document.createElement('label');
-    label.className = 'form-label small';
-    // Use the `q.text` from the object sent by the backend
-    label.innerText = (translations[currentLanguage].dynamic_questions && translations[currentLanguage].dynamic_questions[q.text]) || q.text;
-
-    const radioDiv = document.createElement('div');
-    const yesText = translations[currentLanguage].yes;
-    const noText = translations[currentLanguage].no;
-
-    // Use the unique name for the radio buttons
-    radioDiv.innerHTML = `
-        <input type="radio" class="btn-check" name="${uniqueId}" id="${uniqueId}-yes" value="yes" autocomplete="off" required>
-        <label class="btn btn-outline-success btn-sm" for="${uniqueId}-yes">${yesText}</label>
-        <input type="radio" class="btn-check" name="${uniqueId}" id="${uniqueId}-no" value="no" autocomplete="off" checked>
-        <label class="btn btn-outline-danger btn-sm" for="${uniqueId}-no">${noText}</label>
+    formGroup.innerHTML = `
+        <label class="form-label small">${(translations[currentLanguage].dynamic_questions[q.key]) || q.text}</label>
+        <div>
+            <input type="radio" class="btn-check" name="${uniqueId}" id="${uniqueId}-yes" value="yes" autocomplete="off" required>
+            <label class="btn btn-outline-success btn-sm" for="${uniqueId}-yes">${translations[currentLanguage].yes}</label>
+            <input type="radio" class="btn-check" name="${uniqueId}" id="${uniqueId}-no" value="no" autocomplete="off" checked>
+            <label class="btn btn-outline-danger btn-sm" for="${uniqueId}-no">${translations[currentLanguage].no}</label>
+        </div>
     `;
-    
-    formGroup.appendChild(label);
-    formGroup.appendChild(radioDiv);
     return formGroup;
 }
 
 function displayResults(results) {
-    // --- THIS IS THE FIX FOR THE "N/A" BUG ---
-    // The keys now perfectly match the JSON output from your final Python script.
     const disease = results.dead_heart_analysis;
     const insect = results.insect_analysis;
     const lang = translations[currentLanguage];
-
-    const getConfidenceClass = (diagnosis) => {
-        if (!diagnosis) return "text-muted";
-        if (diagnosis.toLowerCase().includes("present") || diagnosis.toLowerCase().includes("borer")) return "text-danger fw-bold";
+    const getConfidenceClass = (diag) => {
+        if (!diag) return "text-muted";
+        if (diag.toLowerCase().includes("present") || diag.toLowerCase().includes("borer")) return "text-danger fw-bold";
         return "text-success";
     };
-
     resultsContent.innerHTML = `
-        <div class="mb-4">
-            <h5 class="text-success-emphasis">${lang.diseaseAnalysisTitle}</h5>
-            <p class="mb-1"><strong>${lang.finalDiagnosisLabel}</strong> <span class="${getConfidenceClass(disease.final_diagnosis)}">${disease.final_diagnosis || 'N/A'}</span></p>
-            <ul class="list-unstyled small text-muted mt-2">
-                <li><span>${lang.visualDetectionLabel}</span> ${disease.yolo_output || '0.0 area'}</li>
-                <li><span>${lang.symptomAnalysisLabel}</span> Prob. ${disease.tabnet_probability || 'N/A'}</li>
-                <li><span>${lang.fusedCertaintyLabel}</span> Prob. ${disease.fused_probability || 'N/A'}</li>
+        <div class="mb-3">
+            <h6>${lang.diseaseAnalysisTitle}</h6>
+            <p class="mb-1"><strong>${lang.finalDiagnosisLabel}</strong> <span class="${getConfidenceClass(disease.final_diagnosis)}">${disease.final_diagnosis}</span></p>
+            <ul class="list-unstyled small text-muted">
+                <li>${lang.visualDetectionLabel} ${disease.yolo_output}</li>
+                <li>${lang.symptomAnalysisLabel} Prob. ${disease.tabnet_probability}</li>
+                <li>${lang.fusedCertaintyLabel} Prob. ${disease.fused_probability}</li>
             </ul>
         </div>
         <hr>
         <div>
-            <h5 class="text-success-emphasis">${lang.insectAnalysisTitle}</h5>
-            <p class="mb-1"><strong>${lang.finalDiagnosisLabel}</strong> <span class="${getConfidenceClass(insect.final_diagnosis)}">${insect.final_diagnosis || 'N/A'}</span></p>
-            <ul class="list-unstyled small text-muted mt-2">
-                 <li><span>${lang.visualDetectionLabel}</span> ${insect.yolo_output || '0 detections'}</li>
-                 <li><span>${lang.symptomAnalysisLabel}</span> ${insect.tabnet_classification || 'N/A'}</li>
-                 <li><span>${lang.fusedCertaintyLabel}</span> Prob. ${insect.fused_probability || 'N/A'}</li>
+            <h6>${lang.insectAnalysisTitle}</h6>
+            <p class="mb-1"><strong>${lang.finalDiagnosisLabel}</strong> <span class="${getConfidenceClass(insect.final_diagnosis)}">${insect.final_diagnosis}</span></p>
+            <ul class="list-unstyled small text-muted">
+                <li>${lang.visualDetectionLabel} ${insect.yolo_output}</li>
+                <li>${lang.symptomAnalysisLabel} ${insect.tabnet_classification}</li>
+                <li>${lang.fusedCertaintyLabel} Prob. ${insect.fused_probability}</li>
             </ul>
         </div>
     `;
 }
 
-// Initial translation on page load
-document.addEventListener('DOMContentLoaded', () => {
-    translatePage();
-});
+document.addEventListener('DOMContentLoaded', () => { translatePage(); });
