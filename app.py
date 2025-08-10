@@ -11,7 +11,9 @@ from model_handler import (
     get_symptom_questions,
     analyze_symptoms_tabnet
 )
-from fusion import get_fused_prediction
+# --- This is the only import that changes ---
+from fusion import get_fused_prediction_rules
+# We are no longer importing get_fused_prediction
 
 # --- Flask App Setup ---
 app = Flask(__name__)
@@ -55,11 +57,11 @@ def analyze_image():
     }
     return jsonify(response_data)
 
-@app.route('/fuse', methods=['POST'])
+app.route('/fuse', methods=['POST'])
 def fuse_all_predictions():
     """
     This endpoint receives the YOLO results and the user's answers,
-    runs the TabNet and Fusion models, and returns the final diagnosis.
+    runs the TabNet and the TWO Fusion models, and returns the final diagnosis.
     """
     data = request.json
     yolo_disease_area = data.get('yolo_disease_output')
@@ -67,16 +69,18 @@ def fuse_all_predictions():
     disease_answers = data.get('disease_answers')
     insect_answers = data.get('insect_answers')
 
-    # Run TabNet analysis
+    # Run TabNet analysis (this function call stays the same)
     tabnet_disease_prob, tabnet_insect_class = analyze_symptoms_tabnet(disease_answers, insect_answers)
 
-    # Run the final fusion
-    final_output = get_fused_prediction(
+    # --- THIS IS THE ONLY FUNCTION CALL THAT CHANGES ---
+    # Run the final fusion using the new coordinator function
+    final_output = get_fused_prediction_rules(
         yolo_disease_area,
         yolo_insect_count,
         tabnet_disease_prob,
         tabnet_insect_class
     )
+    # ----------------------------------------------------
     
     return jsonify(final_output)
 

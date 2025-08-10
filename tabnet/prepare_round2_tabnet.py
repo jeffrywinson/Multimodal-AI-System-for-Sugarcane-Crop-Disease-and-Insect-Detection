@@ -1,4 +1,4 @@
-# prepare_round2_tabnet.py
+# prepare_round2_tabnet.py (Definitive Final Version with Selective Training)
 
 import pandas as pd
 import torch
@@ -6,9 +6,10 @@ from pytorch_tabnet.tab_model import TabNetClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import random
+import argparse
 
 # ==============================================================================
-# 1. DEFINE NEW DOMAIN-SPECIFIC RULES FOR ROUND 2
+# 1. DEFINE DOMAIN-SPECIFIC RULES FOR ROUND 2
 # ==============================================================================
 
 # For Insect Detection (Early Shoot Borer / Internode Borer / No Insect)
@@ -81,65 +82,59 @@ dead_heart_rules = [
 
 
 # ==============================================================================
-# 2. ADVANCED DATA GENERATION SCRIPT
+# 2. ADVANCED DATA GENERATION (ANTI-OVERFITTING VERSION)
 # ==============================================================================
 
 def generate_multi_class_insect_data(filename, rules, num_rows=20000):
-    """Generates multi-class data for insect detection."""
-    print(f"Generating multi-class synthetic data for {filename}...")
+    """Generates multi-class data with fuzzy scoring to reduce overfitting."""
+    print(f"Generating fuzzy multi-class data for {filename}...")
     questions = [rule[0] for rule in rules]
     score_types = [rule[1] for rule in rules]
     column_headers = [f'q_{i+1}' for i in range(len(questions))]
-    
     data = []
     for _ in range(num_rows):
         answers = [random.choice(['Yes', 'No']) for _ in questions]
         esb_score = 0
         inb_score = 0
-        
         for i, answer in enumerate(answers):
             if answer == 'No': continue
-            
             rule_type = score_types[i]
-            if rule_type == "ESB_positive": esb_score += 2
-            elif rule_type == "INB_positive": inb_score += 2
+            if rule_type == "ESB_positive": esb_score += 2 + random.uniform(-0.5, 0.5)
+            elif rule_type == "INB_positive": inb_score += 2 + random.uniform(-0.5, 0.5)
             elif rule_type == "general_borer_positive":
-                esb_score += 1
-                inb_score += 1
+                esb_score += 1 + random.uniform(-0.5, 0.5)
+                inb_score += 1 + random.uniform(-0.5, 0.5)
             elif rule_type == "ESB_management_positive": esb_score -= 3
-
-        # Determine final class
-        if esb_score > 5 and esb_score > inb_score: final_class = "Early Shoot Borer"
-        elif inb_score > 5 and inb_score > esb_score: final_class = "Internode Borer"
+        threshold = 5 + random.uniform(-1, 1)
+        if esb_score > threshold and esb_score > inb_score: final_class = "Early Shoot Borer"
+        elif inb_score > threshold and inb_score > esb_score: final_class = "Internode Borer"
         else: final_class = "No Insect"
-        
         row = answers + [final_class]
         data.append(row)
-        
     df = pd.DataFrame(data, columns=column_headers + ['Presence'])
     df.to_csv(filename, index=False)
     print(f"Successfully created {filename}.")
 
 def generate_binary_dead_heart_data(filename, rules, num_rows=20000):
-    """Generates binary data for dead heart detection."""
-    print(f"Generating binary synthetic data for {filename}...")
+    """Generates binary data with fuzzy scoring (the balanced approach)."""
+    print(f"Generating balanced fuzzy binary data for {filename}...")
     questions = [rule[0] for rule in rules]
     score_types = [rule[1] for rule in rules]
     column_headers = [f'q_{i+1}' for i in range(len(questions))]
-    
     data = []
     for _ in range(num_rows):
         answers = [random.choice(['Yes', 'No']) for _ in questions]
         score = 0
         for i, answer in enumerate(answers):
             if answer == 'No': continue
-            
             rule_type = score_types[i]
-            if "confirmation_positive" in rule_type: score += 3
-            elif "cause_positive" in rule_type: score += 1
+            # We keep the fuzzy scoring, which is good
+            if "confirmation_positive" in rule_type: score += 3 + random.uniform(-0.5, 0.5)
+            elif "cause_positive" in rule_type: score += 1 + random.uniform(-0.5, 0.5)
             elif "negative" in rule_type: score -= 2
-
-        final_class = "Present" if score > 6 else "Not Present"
+        
+        # We REMOVED the aggressive "label noise" part from the last version
+        final_class = "Present" if score > (6 + random.uniform(-1, 1)) else "Not Present"
         
         row = answers + [final_class]
         data.append(row)
@@ -148,14 +143,13 @@ def generate_binary_dead_heart_data(filename, rules, num_rows=20000):
     df.to_csv(filename, index=False)
     print(f"Successfully created {filename}.")
 
-
 # ==============================================================================
-# 3. TABNET TRAINING SCRIPT
+# 3. TABNET TRAINING SCRIPT (WITH REGULARIZATION)
 # ==============================================================================
 
-def train_tabnet_model(csv_path, model_name):
-    """Loads data, trains a TabNet model, and saves it."""
-    print(f"\n--- Starting training for {model_name} ---")
+def train_tabnet_model(csv_path, model_name, best_params):
+    """Loads data, trains a TabNet model with the best parameters, and saves it."""
+    print(f"\n--- Starting definitive training for {model_name} using best parameters ---")
     
     df = pd.read_csv(csv_path)
     target = 'Presence'
@@ -163,7 +157,6 @@ def train_tabnet_model(csv_path, model_name):
     X = df.drop(columns=[target])
     y = df[target]
 
-    # Preprocessing
     categorical_features = list(X.columns)
     le_y = LabelEncoder()
     y_encoded = le_y.fit_transform(y)
@@ -174,52 +167,80 @@ def train_tabnet_model(csv_path, model_name):
 
     X_train, X_val, y_train, y_val = train_test_split(X.values, y_encoded, test_size=0.2, random_state=42)
 
-    # Use best parameters from Optuna/previous runs
+    scheduler_params = dict(mode="max", patience=10, factor=0.2, verbose=True)
+
     clf = TabNetClassifier(
-        n_d=32, n_a=32,
-        n_steps=5,
-        gamma=1.5,
-        lambda_sparse=0.0001,
-        mask_type='sparsemax',
-        optimizer_fn=torch.optim.Adam,
-        optimizer_params=dict(lr=2e-2, weight_decay=1e-5),
+        n_d=best_params['n_da'],
+        n_a=best_params['n_da'],
+        n_steps=best_params['n_steps'],
+        gamma=best_params['gamma'],
+        lambda_sparse=best_params['lambda_sparse'],
+        mask_type=best_params['mask_type'],
+        optimizer_fn=torch.optim.AdamW,
+        optimizer_params=dict(lr=best_params['lr'], weight_decay=best_params.get('weight_decay', 1e-5)),
+        scheduler_fn=torch.optim.lr_scheduler.ReduceLROnPlateau,
+        scheduler_params=scheduler_params,
         seed=42,
         verbose=1
     )
 
+    # Train for a long time to ensure the model fully converges
     clf.fit(
         X_train=X_train, y_train=y_train,
         eval_set=[(X_val, y_val)],
         eval_name=['validation'],
-        patience=20,
-        max_epochs=150,
+        patience=40,
+        max_epochs=300,
         batch_size=2048
     )
 
     saved_model_path = clf.save_model(f'./{model_name}_model')
-    print(f"--- Training finished. Model saved at {saved_model_path} ---")
-
+    print(f"--- Definitive model saved at {saved_model_path} ---")
 
 # ==============================================================================
 # 4. MAIN EXECUTION BLOCK
 # ==============================================================================
-
 if __name__ == "__main__":
-    print("--- Starting Round 2 TabNet Model Preparation ---")
+    print("--- Preparing Final, Optimized TabNet Models for Round 2 ---")
     
     # Part 1: Generate Data
     generate_multi_class_insect_data('sugarcane_insect_data_r2.csv', insect_rules)
     generate_binary_dead_heart_data('sugarcane_deadheart_data_r2.csv', dead_heart_rules)
     
-    # Part 2: Train Models
+    # Part 2: Train Final Models with the Best Parameters You Found
+    
+    # These are your winning parameters from the Optuna run
+    best_insect_params = {
+        'mask_type': 'sparsemax',
+        'n_da': 40,
+        'n_steps': 6,
+        'gamma': 1.5308803108381908,
+        'lambda_sparse': 0.0007525346361025023,
+        'weight_decay': 0.00023110713728597548,
+        'lr': 0.025707344165775824
+    }
+    
+    best_disease_params = {
+        'mask_type': 'entmax',
+        'n_da': 24,
+        'n_steps': 7,
+        'gamma': 1.97595869478892,
+        'lambda_sparse': 0.00011335382574385305,
+        'weight_decay': 0.00016001843059440895,
+        'lr': 0.022143722355915087
+    }
+
+    # Train both models using their respective best parameters
     train_tabnet_model(
         csv_path='sugarcane_insect_data_r2.csv', 
-        model_name='tabnet_insect'
+        model_name='tabnet_insect',
+        best_params=best_insect_params
     )
     
     train_tabnet_model(
         csv_path='sugarcane_deadheart_data_r2.csv', 
-        model_name='tabnet_disease'
+        model_name='tabnet_disease',
+        best_params=best_disease_params
     )
     
-    print("\n--- All TabNet models for Round 2 have been prepared successfully! ---")
+    print("\n--- All FINAL TabNet models for Round 2 have been prepared successfully! ---")
