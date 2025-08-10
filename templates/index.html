@@ -10,223 +10,70 @@
 <body>
 
     <div class="header">
-        <h1>🧑‍🌾 Agri-AI Diagnostics</h1>
-        <p class="lead">Upload crop and insect images for a complete analysis.</p>
+        <div class="container-fluid d-flex align-items-center">
+            <div class="text-center flex-grow-1">
+                <h1 data-translate-key="headerTitle">🧑‍🌾 Agri-AI Diagnostics</h1>
+                <p class="lead mb-0" data-translate-key="headerLead">Upload a crop or insect image for a complete analysis.</p>
+            </div>
+            <!-- NEW: Language Selector Dropdown -->
+            <div class="dropdown language-selector">
+                <button class="btn btn-light dropdown-toggle" type="button" id="languageDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-translate-key="translateButton">
+                    Translate
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageDropdown">
+                    <li><a class="dropdown-item" href="#" onclick="setLanguage('en')">English</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setLanguage('ta')">தமிழ் (Tamil)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="setLanguage('hi')">हिन्दी (Hindi)</a></li>
+                </ul>
+            </div>
+        </div>
     </div>
 
     <div class="container">
         <div class="card mb-4" id="upload-card">
             <div class="card-body p-4">
-                <h5 class="card-title">Step 1: Upload Images</h5>
+                <h5 class="card-title" data-translate-key="step1Title">Step 1: Upload Image</h5>
                 <form id="upload-form">
                     <div class="mb-3">
-                        <label for="crop-image-input" class="form-label fw-semibold">🌿 Crop Image (for disease analysis)</label>
-                        <input class="form-control" type="file" id="crop-image-input" accept="image/*" required>
+                        <label for="image-input" class="form-label fw-semibold" data-translate-key="uploadLabel">🌿 Upload Image (Crop or Insect)</label>
+                        <input class="form-control" type="file" id="image-input" accept="image/*" required>
                     </div>
-                    <div class="mb-3">
-                        <label for="insect-image-input" class="form-label fw-semibold">🐛 Insect Image (for pest analysis)</label>
-                        <input class="form-control" type="file" id="insect-image-input" accept="image/*" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Analyze Images</button>
+                    <button type="submit" class="btn btn-primary w-100" data-translate-key="analyzeButton">Analyze Image</button>
                 </form>
                  <div class="d-flex justify-content-center mt-3">
                     <div class="spinner-border text-success" role="status" id="spinner">
-                        <span class="visually-hidden">Loading...</span>
+                        <span class="visually-hidden" data-translate-key="loadingSpinner">Loading...</span>
                     </div>
-                </div>
+                 </div>
             </div>
         </div>
 
         <div class="card mb-4" id="symptom-card">
             <div class="card-body p-4">
-                <h5 class="card-title">Step 2: Answer a Few Questions</h5>
-                <p class="text-muted small">Please provide additional information about the crop's condition.</p>
+                <h5 class="card-title" data-translate-key="step2Title">Step 2: Answer a Few Questions</h5>
+                <p class="text-muted small" data-translate-key="step2Lead">Please provide additional information based on the image below and your observations.</p>
+                
+                <div class="text-center mb-4">
+                    <img id="uploaded-image-preview" src="" alt="Uploaded Image Preview" class="img-fluid rounded shadow-sm" style="max-height: 250px; display: none; border: 3px solid #eee;">
+                </div>
+
                 <form id="symptom-form"></form>
-                <button id="submit-symptoms" class="btn btn-success w-100 mt-3">Get Final Diagnosis</button>
+                <button id="submit-symptoms" class="btn btn-success w-100 mt-3" data-translate-key="getDiagnosisButton">Get Final Diagnosis</button>
             </div>
         </div>
         
         <div class="card" id="results-card">
-            <div class="card-header fw-bold bg-light">Final Analysis</div>
+            <div class="card-header fw-bold bg-light" data-translate-key="resultsTitle">Final Analysis</div>
             <div class="card-body p-4">
                 <div id="results-content">
-                    </div>
-                <button class="btn btn-secondary w-100 mt-4" id="reset-btn">Analyze Another Crop</button>
+                </div>
+                <button class="btn btn-secondary w-100 mt-4" id="reset-btn" data-translate-key="resetButton">Analyze Another Crop</button>
             </div>
         </div>
     </div>
 
-<script>
-    // Get references to all HTML elements
-    const uploadForm = document.getElementById('upload-form');
-    // MODIFIED: Get references for both image inputs
-    const cropImageInput = document.getElementById('crop-image-input');
-    const insectImageInput = document.getElementById('insect-image-input');
-    const spinner = document.getElementById('spinner');
-    const resetBtn = document.getElementById('reset-btn');
-    
-    // Other element references (no changes)
-    const uploadCard = document.getElementById('upload-card');
-    const symptomCard = document.getElementById('symptom-card');
-    const symptomForm = document.getElementById('symptom-form');
-    const submitSymptomsBtn = document.getElementById('submit-symptoms');
-    const resultsCard = document.getElementById('results-card');
-    const resultsContent = document.getElementById('results-content');
-    
-    let analysisData = {};
-
-    // --- Logic for Step 1: Handle Image Upload (MODIFIED) ---
-    uploadForm.addEventListener('submit', async (e) => {
-        e.preventDefault(); 
-        
-        // Check if both files are selected
-        if (!cropImageInput.files[0] || !insectImageInput.files[0]) {
-            alert("Please select both a crop image and an insect image.");
-            return;
-        }
-
-        spinner.style.display = 'block';
-        
-        // Create a FormData object and append BOTH files with distinct keys
-        const formData = new FormData();
-        formData.append('crop_image', cropImageInput.files[0]);
-        formData.append('insect_image', insectImageInput.files[0]);
-
-        try {
-            // The fetch call remains the same, but now sends two files
-            const response = await fetch('/analyze', {
-                method: 'POST',
-                body: formData
-            });
-        
-            if (response.ok) {
-                analysisData = await response.json();
-                uploadCard.style.display = 'none';
-                displayQuestions(analysisData);
-                symptomCard.style.display = 'block';
-            } else {
-                alert('Error analyzing images. Please check the server.');
-            }
-        } catch (error) {
-            console.error('Fetch Error:', error);
-            alert('Could not connect to the server. Is the Python app running?');
-        } finally {
-            spinner.style.display = 'none';
-        }
-    });
-
-    // --- No changes are needed for the rest of the JavaScript ---
-    // (The `submitSymptomsBtn` listener and helper functions remain the same)
-    submitSymptomsBtn.addEventListener('click', async () => {
-        const form = new FormData(symptomForm);
-        const answersWithPrefix = Object.fromEntries(form.entries());
-        const finalAnswers = {};
-        for (const key in answersWithPrefix) {
-            const originalKey = key.replace('disease_', '').replace('insect_', '');
-            finalAnswers[originalKey] = answersWithPrefix[key];
-        }
-        const payload = {
-            image_name: analysisData.image_name,
-            yolo_disease: analysisData.yolo_disease,
-            yolo_insect: analysisData.yolo_insect,
-            answers: finalAnswers
-        };
-        try {
-            const response = await fetch('/fuse', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (response.ok) {
-                const finalResults = await response.json();
-                symptomCard.style.display = 'none';
-                displayResults(finalResults);
-                resultsCard.style.display = 'block';
-            } else {
-                alert('Error generating final diagnosis.');
-            }
-        } catch (error) {
-            console.error('Fetch Error:', error);
-            alert('Could not connect to the server for fusion.');
-        }
-    });
-    resetBtn.addEventListener('click', () => {
-        // Hide the results card
-        resultsCard.style.display = 'none';
-        
-        // Clear the file inputs for the next upload
-        cropImageInput.value = '';
-        insectImageInput.value = '';
-
-        // Show the initial upload card
-        uploadCard.style.display = 'block';
-
-        // Reset the data object
-        analysisData = {};
-    });
-    function displayQuestions(data) {
-        symptomForm.innerHTML = ''; 
-        if (data.questions && data.questions.disease_questions) {
-            const diseaseSection = createSection('Disease Symptoms');
-            data.questions.disease_questions.forEach(q => diseaseSection.appendChild(createQuestionElement(q, 'disease_')));
-            symptomForm.appendChild(diseaseSection);
-        }
-        if (data.questions && data.questions.insect_questions) {
-            const insectSection = createSection('Insect Symptoms');
-            data.questions.insect_questions.forEach(q => insectSection.appendChild(createQuestionElement(q, 'insect_')));
-            symptomForm.appendChild(insectSection);
-        }
-    }
-    function createSection(title) {
-        const section = document.createElement('div');
-        section.className = 'question-section';
-        section.innerHTML = `<h6>${title}</h6>`;
-        return section;
-    }
-    function createQuestionElement(q, prefix) {
-        const uniqueId = prefix + q.id;
-        const formGroup = document.createElement('div');
-        formGroup.className = 'mb-3';
-        formGroup.innerHTML = `
-            <label class="form-label small">${q.text}</label>
-            <div>
-                <input type="radio" class="btn-check" name="${uniqueId}" id="${uniqueId}-yes" value="yes" autocomplete="off" required>
-                <label class="btn btn-outline-success btn-sm" for="${uniqueId}-yes">Yes</label>
-                <input type="radio" class="btn-check" name="${uniqueId}" id="${uniqueId}-no" value="no" autocomplete="off" checked>
-                <label class="btn btn-outline-danger btn-sm" for="${uniqueId}-no">No</label>
-            </div>
-        `;
-        return formGroup;
-    }
-    function displayResults(results) {
-        const disease = results.disease_analysis;
-        const insect = results.insect_analysis;
-        const getConfidenceClass = (diagnosis) => {
-            if (diagnosis.startsWith("Confirmed")) return "text-danger";
-            if (diagnosis.startsWith("Possible")) return "text-warning";
-            return "text-success";
-        };
-        resultsContent.innerHTML = `
-            <div class="mb-3">
-                <h6>Disease Analysis</h6>
-                <p class="mb-1"><strong>Final Diagnosis:</strong> <span class="fw-bold ${getConfidenceClass(disease.final_diagnosis)}">${disease.final_diagnosis}</span></p>
-                <ul class="list-unstyled small text-muted">
-                    <li>Visual Detection (Image): ${disease.image_detection}</li>
-                    <li>Symptom Analysis (Answers): ${disease.symptom_prediction}</li>
-                </ul>
-            </div>
-            <hr>
-            <div>
-                <h6>Insect Analysis</h6>
-                <p class="mb-1"><strong>Final Diagnosis:</strong> <span class="fw-bold ${getConfidenceClass(insect.final_diagnosis)}">${insect.final_diagnosis}</span></p>
-                <ul class="list-unstyled small text-muted">
-                    <li>Visual Detection (Image): ${insect.image_detection}</li>
-                    <li>Symptom Analysis (Answers): ${insect.symptom_prediction}</li>
-                </ul>
-            </div>
-        `;
-    }
-</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../static/script.js"></script>
 
 </body>
 </html>

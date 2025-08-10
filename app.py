@@ -1,7 +1,7 @@
 # app.py (Definitive Final Version for Round 2)
 
 import os
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, url_for
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 
@@ -26,34 +26,55 @@ def home():
 @app.route('/analyze', methods=['POST'])
 def analyze_image():
     """
-    This endpoint handles the initial image upload.
-    It runs the YOLO models and sends back the questions for the next step.
+    This endpoint handles a SINGLE image upload.
+    It runs BOTH YOLO models, returns the findings, the relevant questions,
+    and the URL of the uploaded image for preview.
     """
-    if 'crop_image' not in request.files:
-        return jsonify({"error": "Crop image is required."}), 400
+    if 'image_file' not in request.files:
+        return jsonify({"error": "No image file provided."}), 400
     
-    crop_file = request.files['crop_image']
-    if crop_file.filename == '':
+    image_file = request.files['image_file']
+    if image_file.filename == '':
         return jsonify({"error": "Please select an image file."}), 400
         
-    image_filename = secure_filename(crop_file.filename)
+    image_filename = secure_filename(image_file.filename)
     image_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
-    crop_file.save(image_path)
+    image_file.save(image_path)
 
-    # Run both YOLO models on the uploaded image
+    # --- Run BOTH models on the SAME image ---
     yolo_disease_area = predict_disease_yolo(image_path)
     yolo_insect_count = predict_insect_yolo(image_path)
     
-    # Get the correctly formatted questions
-    questions = get_symptom_questions() # This now returns a dictionary
+    all_questions = get_symptom_questions()
+    questions_to_send = {}
+    image_type = "Unknown"
+
+    if yolo_disease_area > 0:
+        questions_to_send['disease_questions'] = all_questions['disease_questions']
+        image_type = "Image contains Dead Heart symptom"
+
+    if yolo_insect_count > 0:
+        questions_to_send['insect_questions'] = all_questions['insect_questions']
+        if image_type.startswith("Image contains Dead Heart"):
+            image_type = "Image contains both Dead Heart and Larva"
+        else:
+            image_type = "Image contains Larva"
+            
+    if not questions_to_send:
+        image_type = "Neither Dead Heart nor Larva detected"
     
-    # Send everything the frontend needs for the next step
+    # MODIFICATION: Create a URL for the saved image
+    image_url = url_for('static', filename=f'uploads/{image_filename}')
+
     response_data = {
+        "image_content_type": image_type,
+        "image_url": image_url, # Add the URL to the response
         "yolo_disease_output": yolo_disease_area,
         "yolo_insect_output": yolo_insect_count,
-        "questions": questions # Send the dictionary of questions
+        "questions": questions_to_send
     }
     return jsonify(response_data)
+
 
 @app.route('/fuse', methods=['POST'])
 def fuse_all_predictions():
