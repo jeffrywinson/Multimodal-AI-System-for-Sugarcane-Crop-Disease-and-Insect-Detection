@@ -1,5 +1,3 @@
-# app.py (Updated with Recommendations and Error Handling)
-
 import os
 from flask import Flask, request, jsonify, render_template, url_for
 from werkzeug.utils import secure_filename
@@ -12,7 +10,6 @@ from model_handler import (
     get_symptom_questions,
     analyze_symptoms_tabnet
 )
-# This is the correct import for your final fusion model
 from fusion import get_fused_prediction_rules
 
 # --- Solutions Database ---
@@ -33,7 +30,6 @@ solutions_db = {
         "ta": "பயிர் ஆரோக்கியமாகத் தெரிகிறது. வழக்கமான கண்காணிப்பு மற்றும் நல்ல விவசாய நடைமுறைகளைத் தொடரவும்.",
         "hi": "फसल स्वस्थ दिख रही है। नियमित निगरानी और अच्छी कृषि पद्धतियों को जारी रखें।"
     }
-    # Add other potential diagnoses and their solutions here
 }
 
 

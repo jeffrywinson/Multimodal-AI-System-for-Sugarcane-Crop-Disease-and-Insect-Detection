@@ -1,4 +1,3 @@
-# predict_disease_tabnet.py
 import numpy as np
 from pytorch_tabnet.tab_model import TabNetClassifier
 import argparse
@@ -11,7 +10,6 @@ def predict(answers_list):
     clf.load_model('./tabnet/tabnet_disease_model.zip')
 
     # Predict probabilities. It returns a value for "Not Present" and "Present". We want the second one.
-    # The output will be a number like 0.842
     prediction_proba = clf.predict_proba(np.array([encoded_answers]))
     probability_present = prediction_proba[0][1]
     print(probability_present)

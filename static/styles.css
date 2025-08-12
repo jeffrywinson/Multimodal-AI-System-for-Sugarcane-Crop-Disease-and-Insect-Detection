@@ -13,7 +13,7 @@ body {
 .header {
     background-color: rgba(44, 107, 47, 0.8);
     color: white;
-    padding: 1.5rem 2rem; /* Adjusted padding */
+    padding: 1.5rem 2rem; 
     text-align: center;
     position: relative; /* Needed for positioning children */
 }
@@ -22,7 +22,6 @@ body {
     font-weight: bold;
 }
 
-/* NEW: Language Selector Styling */
 .language-selector {
     position: absolute;
     top: 1.5rem;

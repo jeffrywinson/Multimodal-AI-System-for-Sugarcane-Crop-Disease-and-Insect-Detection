@@ -1,5 +1,3 @@
-# In fusion.py
-
 import math
 
 def get_fused_prediction_rules(yolo_disease_area, yolo_insect_count, tabnet_disease_prob, tabnet_insect_class):

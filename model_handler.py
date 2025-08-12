@@ -1,12 +1,8 @@
-# model_handler.py (Definitive Final Version)
 import pandas as pd
 import numpy as np
 from pytorch_tabnet.tab_model import TabNetClassifier
 from ultralytics import YOLO
 
-# ==============================================================================
-# 1. FINAL, CORRECT QUESTIONS FOR ROUND 2
-# ==============================================================================
 insect_rules = [
     ("Is the crop ≤ 120 days old (i.e., within first 4 months)?", "ESB_positive"),
     ("Did the damage start after 4 months from planting?", "INB_positive"),
@@ -83,11 +79,6 @@ print("--- All models loaded successfully. ---")
 
 
 # --- PREDICTION FUNCTIONS ---
-
-# ==============================================================================
-# 2. DEFINE THE PREDICTION FUNCTIONS (FINAL VERSION)
-# ==============================================================================
-
 def get_symptom_questions():
     """
     Returns a structured dictionary of questions with unique, language-independent keys.

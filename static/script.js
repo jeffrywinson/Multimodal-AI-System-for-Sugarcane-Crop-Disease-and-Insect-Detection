@@ -1,5 +1,3 @@
-// static/script.js
-
 // ============== TRANSLATION SETUP ==============
 let currentLanguage = 'en';
 
@@ -29,7 +27,7 @@ const translations = {
         visualDetectionLabel: "Visual Detection (Image):",
         symptomAnalysisLabel: "Symptom Analysis (TabNet):",
         fusedCertaintyLabel: "Fused Certainty:",
-        recommendationTitle: "💡 Recommendation", // Added for enhancement
+        recommendationTitle: "💡 Recommendation",
         // Dynamic Questions using the short keys from model_handler.py
         dynamic_questions: {
             "dh_q1": "Have you seen the central growing point of the stalk damaged or dead?",
@@ -298,7 +296,6 @@ function setLanguage(lang) {
     translatePage();
 }
 
-// ============== EXISTING CODE (No changes needed below this line, except for displayResults) ==============
 const uploadForm = document.getElementById('upload-form');
 const imageInput = document.getElementById('image-input');
 const spinner = document.getElementById('spinner');

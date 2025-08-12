@@ -1,4 +1,3 @@
-# detect_disease.py (Version 2 - Area Calculation)
 from ultralytics import YOLO
 import argparse
 import torch
@@ -12,7 +11,7 @@ def predict_disease_area(image_path):
     # Run prediction on the image
     results = model.predict(image_path, verbose=False)
     
-    # --- NEW LOGIC: CALCULATE AREA ---
+    # --- CALCULATE AREA ---
     total_disease_area = 0
     
     # Check if any masks (disease areas) were detected

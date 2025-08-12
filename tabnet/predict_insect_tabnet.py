@@ -1,4 +1,3 @@
-# predict_insect_tabnet.py (Updated for Round 2)
 import numpy as np
 from pytorch_tabnet.tab_model import TabNetClassifier
 import argparse

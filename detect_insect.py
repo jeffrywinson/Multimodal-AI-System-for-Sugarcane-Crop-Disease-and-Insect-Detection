@@ -1,4 +1,3 @@
-# detect_insect.py
 from ultralytics import YOLO
 import argparse
 import torch

@@ -1,5 +1,3 @@
-# prepare_round2_tabnet.py (Definitive Final Version with Selective Training)
-
 import pandas as pd
 import torch
 from pytorch_tabnet.tab_model import TabNetClassifier
@@ -7,10 +5,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import random
 import argparse
-
-# ==============================================================================
-# 1. DEFINE DOMAIN-SPECIFIC RULES FOR ROUND 2
-# ==============================================================================
 
 # For Insect Detection (Early Shoot Borer / Internode Borer / No Insect)
 insect_rules = [
@@ -80,11 +74,6 @@ dead_heart_rules = [
     ("Is there no recurrence of dead heart symptoms from previous seasons?", "dead_heart_confirmation_negative")
 ]
 
-
-# ==============================================================================
-# 2. ADVANCED DATA GENERATION (ANTI-OVERFITTING VERSION)
-# ==============================================================================
-
 def generate_multi_class_insect_data(filename, rules, num_rows=20000):
     """Generates multi-class data with fuzzy scoring to reduce overfitting."""
     print(f"Generating fuzzy multi-class data for {filename}...")
@@ -128,12 +117,10 @@ def generate_binary_dead_heart_data(filename, rules, num_rows=20000):
         for i, answer in enumerate(answers):
             if answer == 'No': continue
             rule_type = score_types[i]
-            # We keep the fuzzy scoring, which is good
             if "confirmation_positive" in rule_type: score += 3 + random.uniform(-0.5, 0.5)
             elif "cause_positive" in rule_type: score += 1 + random.uniform(-0.5, 0.5)
             elif "negative" in rule_type: score -= 2
         
-        # We REMOVED the aggressive "label noise" part from the last version
         final_class = "Present" if score > (6 + random.uniform(-1, 1)) else "Not Present"
         
         row = answers + [final_class]
@@ -142,10 +129,6 @@ def generate_binary_dead_heart_data(filename, rules, num_rows=20000):
     df = pd.DataFrame(data, columns=column_headers + ['Presence'])
     df.to_csv(filename, index=False)
     print(f"Successfully created {filename}.")
-
-# ==============================================================================
-# 3. TABNET TRAINING SCRIPT (WITH REGULARIZATION)
-# ==============================================================================
 
 def train_tabnet_model(csv_path, model_name, best_params):
     """Loads data, trains a TabNet model with the best parameters, and saves it."""
@@ -184,7 +167,6 @@ def train_tabnet_model(csv_path, model_name, best_params):
         verbose=1
     )
 
-    # Train for a long time to ensure the model fully converges
     clf.fit(
         X_train=X_train, y_train=y_train,
         eval_set=[(X_val, y_val)],
@@ -197,19 +179,12 @@ def train_tabnet_model(csv_path, model_name, best_params):
     saved_model_path = clf.save_model(f'./{model_name}_model')
     print(f"--- Definitive model saved at {saved_model_path} ---")
 
-# ==============================================================================
-# 4. MAIN EXECUTION BLOCK
-# ==============================================================================
 if __name__ == "__main__":
     print("--- Preparing Final, Optimized TabNet Models for Round 2 ---")
     
-    # Part 1: Generate Data
     generate_multi_class_insect_data('sugarcane_insect_data_r2.csv', insect_rules)
     generate_binary_dead_heart_data('sugarcane_deadheart_data_r2.csv', dead_heart_rules)
-    
-    # Part 2: Train Final Models with the Best Parameters You Found
-    
-    # These are your winning parameters from the Optuna run
+
     best_insect_params = {
         'mask_type': 'sparsemax',
         'n_da': 40,
