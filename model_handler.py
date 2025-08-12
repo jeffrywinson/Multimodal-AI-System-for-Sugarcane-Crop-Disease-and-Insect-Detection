@@ -75,9 +75,9 @@ dead_heart_rules = [
 
 # --- MODEL LOADING ---
 print("--- Loading all models into memory... ---")
-TABNET_DISEASE_MODEL = TabNetClassifier(); TABNET_DISEASE_MODEL.load_model('./tabnet/tabnet_disease_model.zip')
-TABNET_INSECT_MODEL = TabNetClassifier(); TABNET_INSECT_MODEL.load_model('./tabnet/tabnet_insect_model.zip')
-YOLO_DISEASE_MODEL = YOLO("./YOLOv8s-seg/best.pt")
+TABNET_DISEASE_MODEL = TabNetClassifier(); TABNET_DISEASE_MODEL.load_model('./models/tabnet_disease_model.zip')
+TABNET_INSECT_MODEL = TabNetClassifier(); TABNET_INSECT_MODEL.load_model('./models/tabnet_insect_model.zip')
+YOLO_DISEASE_MODEL = YOLO("./models/yolov8_disease_detection.pt")
 YOLO_INSECT_MODEL = YOLO("./models/yolov8s_insect_detection_best.pt")
 print("--- All models loaded successfully. ---")
 
