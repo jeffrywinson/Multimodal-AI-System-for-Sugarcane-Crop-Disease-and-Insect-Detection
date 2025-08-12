@@ -78,7 +78,7 @@ print("--- Loading all models into memory... ---")
 TABNET_DISEASE_MODEL = TabNetClassifier(); TABNET_DISEASE_MODEL.load_model('./tabnet/tabnet_disease_model.zip')
 TABNET_INSECT_MODEL = TabNetClassifier(); TABNET_INSECT_MODEL.load_model('./tabnet/tabnet_insect_model.zip')
 YOLO_DISEASE_MODEL = YOLO("./YOLOv8s-seg/best.pt")
-YOLO_INSECT_MODEL = YOLO(r"D:\finalllll\Multimodal-AI-System-for-Sugarcane-Crop-Disease-and-Insect-Detection\YOLOv8s\larva\best (1).pt")
+YOLO_INSECT_MODEL = YOLO("./models/yolov8s_insect_detection_best.pt")
 print("--- All models loaded successfully. ---")
 
 
